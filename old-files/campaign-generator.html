@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MamaMag Campaign Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #ff69b4;
+            --primary-light: rgba(255, 105, 180, 0.1);
+            --text-color: #333;
+            --bg-color: #f9f2f4;
+            --card-bg: #fff;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+        
+        header img {
+            max-width: 250px;
+            margin-bottom: 15px;
+        }
+        
+        header h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            color: #666;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .card h2 {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .required:after {
+            content: " *";
+            color: var(--primary-color);
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn:hover {
+            background-color: #ff45a1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(255, 105, 180, 0.3);
+        }
+        
+        .btn-secondary {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e0e0e0;
+            color: #222;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        table th {
+            background-color: #f5f5f5;
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .page-template {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        
+        .page-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        
+        .page-controls button {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-left: 5px;
+        }
+        
+        .page-controls button:hover {
+            color: var(--primary-color);
+        }
+        
+        .clone-url {
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin-top: 20px;
+            word-break: break-all;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="mamamag-logo.svg" alt="MamaMag Logo">
+            <h1>MamaMag Campaign Manager</h1>
+            <p>Create and manage your MamaMag campaigns</p>
+        </header>
+        
+        <div class="card">
+            <h2>My Campaigns</h2>
+            <p>View and manage your existing campaigns or create a new one.</p>
+            
+            <table id="campaigns-table">
+                <thead>
+                    <tr>
+                        <th>Campaign Name</th>
+                        <th>Status</th>
+                        <th>Pages</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="campaigns-body">
+                    <!-- Sample data, will be replaced by JavaScript -->
+                    <tr>
+                        <td>Spring 2025 - Maternity in Style</td>
+                        <td>Active</td>
+                        <td>14</td>
+                        <td>April 10, 2025</td>
+                        <td>
+                            <button class="btn btn-secondary">Edit</button>
+                            <button class="btn">View Form</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="btn-group">
+                <button class="btn" id="create-campaign-btn">Create New Campaign</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="campaign-form">
+            <h2>Create New Campaign</h2>
+            
+            <div class="form-group">
+                <label for="campaign-name" class="required">Campaign Name</label>
+                <input type="text" id="campaign-name" placeholder="e.g. Summer 2025 - Beach Essentials" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="campaign-id" class="required">Campaign ID</label>
+                <input type="text" id="campaign-id" placeholder="e.g. MM-SU25" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="campaign-description">Campaign Description</label>
+                <textarea id="campaign-description" rows="3" placeholder="Describe your campaign"></textarea>
+            </div>
+            
+            <h3>Page Configuration</h3>
+            <p>Define the pages available in your campaign. You can add, remove, and configure pages.</p>
+            
+            <div id="pages-container">
+                <!-- Pages will be added here -->
+                <div class="page-template" data-page-id="cover">
+                    <div class="page-controls">
+                        <button type="button" class="remove-page">×</button>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page ID</label>
+                        <input type="text" class="page-id" value="cover" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Number</label>
+                        <input type="text" class="page-number" value="Cover" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Name</label>
+                        <input type="text" class="page-name" value="Front Cover Feature" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Type</label>
+                        <select class="page-type">
+                            <option value="Premium" selected>Premium</option>
+                            <option value="Standard">Standard</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Base Price ($)</label>
+                        <input type="number" class="base-price" value="7500" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Premium ($)</label>
+                        <input type="number" class="additional-premium" value="10000">
+                    </div>
+                    <div class="form-group">
+                        <label>Facing Page ID (if applicable)</label>
+                        <input type="text" class="facing-page" value="">
+                    </div>
+                </div>
+            </div>
+            
+            <button type="button" class="btn btn-secondary" id="add-page-btn">+ Add Page</button>
+            
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary" id="cancel-campaign-btn">Cancel</button>
+                <button type="button" class="btn" id="save-campaign-btn">Save Campaign</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="success-card">
+            <h2>Campaign Created Successfully!</h2>
+            <div class="message success">
+                <p>Your campaign has been created and is ready to use. You can now share the form link with brands.</p>
+            </div>
+            
+            <h3>Form URL</h3>
+            <div class="clone-url" id="form-url">
+                https://mamamag.netlify.app/?campaign=MM-SP25
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="copy-url-btn">Copy URL</button>
+                <button class="btn" id="view-campaigns-btn">Back to Campaigns</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Sample data for demo purposes
+        const sampleCampaigns = [
+            {
+                id: "MM-SP25",
+                name: "Spring 2025 - Maternity in Style",
+                description: "Spring edition featuring maternity fashion and essentials",
+                status: "Active",
+                pages: 14,
+                created: "April 10, 2025",
+                pages: [
+                    {
+                        id: "cover",
+                        pageNumber: "Cover",
+                        name: "Front Cover Feature",
+                        type: "Premium",
+                        basePrice: 7500,
+                        additionalPremium: 10000
+                    },
+                    {
+                        id: "ifc",
+                        pageNumber: "1",
+                        name: "Inside Front Cover",
+                        type: "Premium",
+                        basePrice: 7500,
+                        additionalPremium: 7000
+                    },
+                    // More pages...
+                ]
+            }
+        ];
+        
+        // DOM Elements
+        const createCampaignBtn = document.getElementById('create-campaign-btn');
+        const campaignForm = document.getElementById('campaign-form');
+        const campaignsTable = document.getElementById('campaigns-table');
+        const campaignsBody = document.getElementById('campaigns-body');
+        const addPageBtn = document.getElementById('add-page-btn');
+        const pagesContainer = document.getElementById('pages-container');
+        const cancelCampaignBtn = document.getElementById('cancel-campaign-btn');
+        const saveCampaignBtn = document.getElementById('save-campaign-btn');
+        const successCard = document.getElementById('success-card');
+        const formUrlElement = document.getElementById('form-url');
+        const copyUrlBtn = document.getElementById('copy-url-btn');
+        const viewCampaignsBtn = document.getElementById('view-campaigns-btn');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCampaigns();
+            setupEventListeners();
+            
+            // Add initial page template if none exist
+            if (pagesContainer.children.length === 0) {
+                addPageTemplate();
+            }
+        });
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            createCampaignBtn.addEventListener('click', showCampaignForm);
+            cancelCampaignBtn.addEventListener('click', hideCampaignForm);
+            addPageBtn.addEventListener('click', addPageTemplate);
+            saveCampaignBtn.addEventListener('click', saveCampaign);
+            copyUrlBtn.addEventListener('click', copyFormUrl);
+            viewCampaignsBtn.addEventListener('click', showCampaignsList);
+            
+            // Delegate event for remove page buttons
+            pagesContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-page')) {
+                    const pageTemplate = e.target.closest('.page-template');
+                    if (pagesContainer.children.length > 1) {
+                        pageTemplate.remove();
+                    } else {
+                        alert('You must have at least one page in your campaign.');
+                    }
+                }
+            });
+        }
+        
+        // Load campaigns into the table
+        function loadCampaigns() {
+            campaignsBody.innerHTML = '';
+            
+            // In production, this would fetch campaigns from an API
+            // For demo purposes, use sample data
+            sampleCampaigns.forEach(campaign => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${campaign.name}</td>
+                    <td>${campaign.status}</td>
+                    <td>${campaign.pages.length}</td>
+                    <td>${campaign.created}</td>
+                    <td>
+                        <button class="btn btn-secondary" data-campaign-id="${campaign.id}" data-action="edit">Edit</button>
+                        <button class="btn" data-campaign-id="${campaign.id}" data-action="view">View Form</button>
+                    </td>
+                `;
+                
+                // Add event listeners to buttons
+                const editBtn = row.querySelector('[data-action="edit"]');
+                const viewBtn = row.querySelector('[data-action="view"]');
+                
+                editBtn.addEventListener('click', () => editCampaign(campaign.id));
+                viewBtn.addEventListener('click', () => viewCampaignForm(campaign.id));
+                
+                campaignsBody.appendChild(row);
+            });
+        }
+        
+        // Show campaign form
+        function showCampaignForm() {
+            // Hide campaigns list
+            document.querySelector('.card:not(.hidden)').classList.add('hidden');
+            
+            // Show campaign form
+            campaignForm.classList.remove('hidden');
+            
+            // Clear form fields
+            document.getElementById('campaign-name').value = '';
+            document.getElementById('campaign-id').value = '';
+            document.getElementById('campaign-description').value = '';
+            
+            // Clear pages
+            pagesContainer.innerHTML = '';
+            
+            // Add initial page template
+            addPageTemplate();
+        }
+        
+        // Hide campaign form
+        function hideCampaignForm() {
+            campaignForm.classList.add('hidden');
+            document.querySelector('.card:first-child').classList.remove('hidden');
+        }
+        
+        // Add a new page template
+        function addPageTemplate() {
+            const pageId = `page-${pagesContainer.children.length + 1}`;
+            const pageNumber = pagesContainer.children.length + 1;
+            
+            const pageTemplate = document.createElement('div');
+            pageTemplate.className = 'page-template';
+            pageTemplate.dataset.pageId = pageId;
+            
+            pageTemplate.innerHTML = `
+                <div class="page-controls">
+                    <button type="button" class="remove-page">×</button>
+                </div>
+                <div class="form-group">
+                    <label class="required">Page ID</label>
+                    <input type="text" class="page-id" value="${pageId}" required>
+                </div>
+                <div class="form-group">
+                    <label class="required">Page Number</label>
+                    <input type="text" class="page-number" value="${pageNumber}" required>
+                </div>
+                <div class="form-group">
+                    <label class="required">Page Name</label>
+                    <input type="text" class="page-name" value="Standard Full Page" required>
+                </div>
+                <div class="form-group">
+                    <label class="required">Page Type</label>
+                    <select class="page-type">
+                        <option value="Premium">Premium</option>
+                        <option value="Standard" selected>Standard</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="required">Base Price ($)</label>
+                    <input type="number" class="base-price" value="7500" required>
+                </div>
+                <div class="form-group">
+                    <label>Additional Premium ($)</label>
+                    <input type="number" class="additional-premium" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Facing Page ID (if applicable)</label>
+                    <input type="text" class="facing-page" value="">
+                </div>
+            `;
+            
+            pagesContainer.appendChild(pageTemplate);
+        }
+        
+        // Collect form data
+        function collectFormData() {
+            const campaignData = {
+                id: document.getElementById('campaign-id').value,
+                name: document.getElementById('campaign-name').value,
+                description: document.getElementById('campaign-description').value,
+                status: 'Active',
+                created: new Date().toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                pages: []
+            };
+            
+            // Collect pages data
+            const pageTemplates = pagesContainer.querySelectorAll('.page-template');
+            pageTemplates.forEach(template => {
+                const page = {
+                    id: template.querySelector('.page-id').value,
+                    pageNumber: template.querySelector('.page-number').value,
+                    name: template.querySelector('.page-name').value,
+                    type: template.querySelector('.page-type').value,
+                    basePrice: parseInt(template.querySelector('.base-price').value),
+                    additionalPremium: parseInt(template.querySelector('.additional-premium').value),
+                    available: true
+                };
+                
+                // Add facing page if specified
+                const facingPage = template.querySelector('.facing-page').value;
+                if (facingPage) {
+                    page.facingPage = facingPage;
+                }
+                
+                campaignData.pages.push(page);
+            });
+            
+            return campaignData;
+        }
+        
+        // Save campaign
+        function saveCampaign() {
+            // Validate form
+            const campaignName = document.getElementById('campaign-name').value;
+            const campaignId = document.getElementById('campaign-id').value;
+            
+            if (!campaignName || !campaignId) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+            
+            // Collect form data
+            const campaignData = collectFormData();
+            
+            // In production, this would send data to an API
+            console.log('Campaign data:', campaignData);
+            
+            // For demo purposes, add to sample data
+            sampleCampaigns.push(campaignData);
+            
+            // Show success message
+            campaignForm.classList.add('hidden');
+            successCard.classList.remove('hidden');
+            
+            // Update form URL
+            formUrlElement.textContent = `https://mamamag.netlify.app/?campaign=${campaignData.id}`;
+        }
+        
+        // Copy form URL to clipboard
+        function copyFormUrl() {
+            const url = formUrlElement.textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                copyUrlBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyUrlBtn.textContent = 'Copy URL';
+                }, 2000);
+            });
+        }
+        
+        // Show campaigns list
+        function showCampaignsList() {
+            successCard.classList.add('hidden');
+            document.querySelector('.card:first-child').classList.remove('hidden');
+            loadCampaigns();
+        }
+        
+        // Edit campaign
+        function editCampaign(campaignId) {
+            // Find campaign
+            const campaign = sampleCampaigns.find(c => c.id === campaignId);
+            if (!campaign) return;
+            
+            // Show campaign form
+            document.querySelector('.card:not(.hidden)').classList.add('hidden');
+            campaignForm.classList.remove('hidden');
+            
+            // Fill form fields
+            document.getElementById('campaign-name').value = campaign.name;
+            document.getElementById('campaign-id').value = campaign.id;
+            document.getElementById('campaign-description').value = campaign.description || '';
+            
+            // Clear pages
+            pagesContainer.innerHTML = '';
+            
+            // Add page templates
+            campaign.pages.forEach(page => {
+                const pageTemplate = document.createElement('div');
+                pageTemplate.className = 'page-template';
+                pageTemplate.dataset.pageId = page.id;
+                
+                pageTemplate.innerHTML = `
+                    <div class="page-controls">
+                        <button type="button" class="remove-page">×</button>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page ID</label>
+                        <input type="text" class="page-id" value="${page.id}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Number</label>
+                        <input type="text" class="page-number" value="${page.pageNumber}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Name</label>
+                        <input type="text" class="page-name" value="${page.name}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Page Type</label>
+                        <select class="page-type">
+                            <option value="Premium" ${page.type === 'Premium' ? 'selected' : ''}>Premium</option>
+                            <option value="Standard" ${page.type === 'Standard' ? 'selected' : ''}>Standard</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Base Price ($)</label>
+                        <input type="number" class="base-price" value="${page.basePrice}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Premium ($)</label>
+                        <input type="number" class="additional-premium" value="${page.additionalPremium || 0}">
+                    </div>
+                    <div class="form-group">
+                        <label>Facing Page ID (if applicable)</label>
+                        <input type="text" class="facing-page" value="${page.facingPage || ''}">
+                    </div>
+                `;
+                
+                pagesContainer.appendChild(pageTemplate);
+            });
+        }
+        
+        // View campaign form
+        function viewCampaignForm(campaignId) {
+            window.open(`https://mamamag.netlify.app/?campaign=${campaignId}`, '_blank');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MamaMag Active Campaigns</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #ff69b4;
+            --primary-light: rgba(255, 105, 180, 0.1);
+            --text-color: #333;
+            --bg-color: #f9f2f4;
+            --card-bg: #fff;
+            --border-color: #ddd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background-color: var(--card-bg);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 40px;
+        }
+        
+        header img {
+            max-width: 250px;
+            margin-bottom: 20px;
+        }
+        
+        header h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .campaigns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .campaign-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .campaign-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .campaign-image {
+            height: 200px;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+        
+        .campaign-image::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.3));
+        }
+        
+        .campaign-content {
+            padding: 25px;
+        }
+        
+        .campaign-title {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .campaign-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .meta-item i {
+            color: var(--primary-color);
+        }
+        
+        .campaign-description {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        .campaign-cta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background-color: #ff45a1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(255, 105, 180, 0.3);
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .due-date {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .due-date.warning {
+            color: #ff9800;
+        }
+        
+        .due-date.urgent {
+            color: #f44336;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--card-bg);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .empty-state h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+        }
+        
+        .empty-state p {
+            color: #666;
+            max-width: 500px;
+            margin: 0 auto 30px;
+        }
+        
+        .filters-section {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .filters-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .filter-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 0.9rem;
+            font-family: 'Poppins', sans-serif;
+            background-color: white;
+        }
+        
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .sort-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .sort-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .sort-option:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .sort-option.active {
+            background: var(--primary-light);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .sort-option i {
+            font-size: 0.8rem;
+        }
+        
+        @media (max-width: 768px) {
+            .campaigns-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header {
+                padding: 20px;
+            }
+            
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="mamamag-logo.svg" alt="MamaMag Logo">
+        <h1>Active Campaigns</h1>
+        <p>Explore our current magazine campaigns and find the perfect opportunity for your brand</p>
+    </header>
+    
+    <div class="container">
+        <div class="filters-section">
+            <div class="search-bar">
+                <input type="text" class="search-input" placeholder="Search campaigns..." id="search-input">
+                <button class="btn" id="search-btn">Search</button>
+            </div>
+            
+            <div class="filters-row">
+                <div class="filter-group">
+                    <label class="filter-label">Volume Range</label>
+                    <select class="filter-select" id="volume-filter">
+                        <option value="">All Volumes</option>
+                        <option value="50000">50,000</option>
+                        <option value="100000">100,000</option>
+                        <option value="250000">250,000</option>
+                        <option value="500000">500,000</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Due Date</label>
+                    <select class="filter-select" id="due-date-filter">
+                        <option value="">All Dates</option>
+                        <option value="7">Within 7 days</option>
+                        <option value="14">Within 14 days</option>
+                        <option value="30">Within 30 days</option>
+                        <option value="60">Within 60 days</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="filters-row">
+                <button class="btn btn-secondary" id="clear-filters-btn">Clear Filters</button>
+            </div>
+            
+            <div class="sort-row">
+                <div class="sort-option" data-sort="standard-price">
+                    <span>Standard Page Price</span>
+                    <i>↑</i>
+                </div>
+                <div class="sort-option" data-sort="cover-price">
+                    <span>Cover Page Price</span>
+                    <i>↑</i>
+                </div>
+                <div class="sort-option" data-sort="due-date">
+                    <span>Due Date</span>
+                    <i>↑</i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="campaigns-grid" id="campaigns-container">
+            <!-- Campaign cards will be dynamically inserted here -->
+        </div>
+    </div>
+    
+    <script>
+        // Sample campaign data - in production, this would come from an API
+        const campaigns = [
+            {
+                id: "MM-SP25",
+                name: "Spring 2025 - Maternity in Style",
+                description: "Spring edition featuring maternity fashion and essentials for new moms. Showcase your brand in this seasonal collection.",
+                image: "https://images.unsplash.com/photo-1519823551279-64ac92734fb1?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+                inHomeDate: "2025-05-15",
+                assetDueDate: "2025-04-01",
+                volume: 50000,
+                audience: "New moms in their third trimester",
+                pageCount: 24,
+                status: "Active",
+                pricing: {
+                    standardPage: 7500,
+                    coverPage: 15000
+                }
+            },
+            {
+                id: "MM-SU25",
+                name: "Summer 2025 - Beach Essentials",
+                description: "Summer collection featuring beach and outdoor essentials for moms and babies. Perfect for brands in the outdoor and travel space.",
+                image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+                inHomeDate: "2025-08-01",
+                assetDueDate: "2025-06-15",
+                volume: 75000,
+                audience: "Moms with young children",
+                pageCount: 32,
+                status: "Active",
+                pricing: {
+                    standardPage: 8000,
+                    coverPage: 16000
+                }
+            }
+        ];
+        
+        // DOM Elements
+        const campaignsContainer = document.getElementById('campaigns-container');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCampaigns();
+        });
+        
+        // Load campaigns
+        function loadCampaigns() {
+            if (campaigns.length === 0) {
+                campaignsContainer.classList.add('hidden');
+                return;
+            }
+            
+            campaignsContainer.innerHTML = '';
+            
+            campaigns.forEach(campaign => {
+                const card = createCampaignCard(campaign);
+                campaignsContainer.appendChild(card);
+            });
+        }
+        
+        // Create campaign card
+        function createCampaignCard(campaign) {
+            const card = document.createElement('div');
+            card.className = 'campaign-card';
+            
+            const dueDateClass = getDueDateClass(campaign.assetDueDate);
+            
+            card.innerHTML = `
+                <div class="campaign-image" style="background-image: url('${campaign.image}')"></div>
+                <div class="campaign-content">
+                    <h3 class="campaign-title">${campaign.name}</h3>
+                    <div class="campaign-meta">
+                        <div class="meta-item">
+                            <i>📅</i>
+                            <span>In-Home: ${formatDate(campaign.inHomeDate)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <i>👥</i>
+                            <span>${formatNumber(campaign.volume)} readers</span>
+                        </div>
+                        <div class="meta-item">
+                            <i>📚</i>
+                            <span>${campaign.pageCount} pages</span>
+                        </div>
+                        <div class="meta-item">
+                            <i>💰</i>
+                            <span>From $${formatNumber(campaign.pricing.standardPage)}/page</span>
+                        </div>
+                    </div>
+                    <p class="campaign-description">${campaign.description}</p>
+                    <div class="campaign-cta">
+                        <a href="index.html?campaign=${campaign.id}" class="btn">Reserve Space</a>
+                        <span class="due-date ${dueDateClass}">
+                            Assets due: ${formatDate(campaign.assetDueDate)}
+                        </span>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        // Format date
+        function formatDate(dateString) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('en-US', options);
+        }
+        
+        // Format number with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Get due date class based on urgency
+        function getDueDateClass(dueDate) {
+            const today = new Date();
+            const due = new Date(dueDate);
+            const diffTime = due - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 7) {
+                return 'urgent';
+            } else if (diffDays < 30) {
+                return 'warning';
+            }
+            return '';
+        }
+        
+        // Add to the setupEventListeners function
+        function setupEventListeners() {
+            // Search functionality
+            const searchInput = document.getElementById('search-input');
+            const searchBtn = document.getElementById('search-btn');
+            const clearFiltersBtn = document.getElementById('clear-filters-btn');
+            
+            searchInput.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    filterCampaigns();
+                }
+            });
+            
+            searchBtn.addEventListener('click', filterCampaigns);
+            
+            // Clear filters functionality
+            clearFiltersBtn.addEventListener('click', function() {
+                document.getElementById('search-input').value = '';
+                document.getElementById('volume-filter').value = '';
+                document.getElementById('due-date-filter').value = '';
+                document.querySelectorAll('.sort-option').forEach(opt => {
+                    opt.classList.remove('active');
+                    opt.querySelector('i').textContent = '↑';
+                });
+                loadCampaigns();
+            });
+            
+            // Filter functionality
+            document.getElementById('volume-filter').addEventListener('change', filterCampaigns);
+            document.getElementById('due-date-filter').addEventListener('change', filterCampaigns);
+            
+            // Sort functionality
+            document.querySelectorAll('.sort-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const sortType = this.dataset.sort;
+                    const isAscending = !this.classList.contains('active') || 
+                                      this.querySelector('i').textContent === '↓';
+                    
+                    // Update sort indicators
+                    document.querySelectorAll('.sort-option').forEach(opt => {
+                        opt.classList.remove('active');
+                        opt.querySelector('i').textContent = '↑';
+                    });
+                    
+                    this.classList.add('active');
+                    this.querySelector('i').textContent = isAscending ? '↑' : '↓';
+                    
+                    sortCampaigns(sortType, isAscending);
+                });
+            });
+        }
+        
+        // Add new filter function
+        function filterCampaigns() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const volumeFilter = document.getElementById('volume-filter').value;
+            const dueDateFilter = document.getElementById('due-date-filter').value;
+            
+            const filteredCampaigns = campaigns.filter(campaign => {
+                // Search term filter
+                const matchesSearch = searchTerm === '' || 
+                    campaign.name.toLowerCase().includes(searchTerm) ||
+                    campaign.description.toLowerCase().includes(searchTerm) ||
+                    campaign.audience.toLowerCase().includes(searchTerm);
+                
+                // Volume filter
+                let matchesVolume = true;
+                if (volumeFilter) {
+                    const [min, max] = volumeFilter.split('-').map(v => v === '' ? 0 : parseInt(v.replace(/,/g, '')));
+                    matchesVolume = campaign.volume >= min && 
+                                  (max ? campaign.volume <= max : true);
+                }
+                
+                // Due date filter
+                let matchesDueDate = true;
+                if (dueDateFilter) {
+                    const today = new Date();
+                    const due = new Date(campaign.assetDueDate);
+                    const diffTime = due - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    matchesDueDate = diffDays <= parseInt(dueDateFilter);
+                }
+                
+                return matchesSearch && matchesVolume && matchesDueDate;
+            });
+            
+            displayCampaigns(filteredCampaigns);
+        }
+        
+        // Add new sort function
+        function sortCampaigns(sortType, isAscending) {
+            const sortedCampaigns = [...campaigns].sort((a, b) => {
+                let comparison = 0;
+                
+                switch(sortType) {
+                    case 'standard-price':
+                        comparison = a.pricing.standardPage - b.pricing.standardPage;
+                        break;
+                    case 'cover-price':
+                        comparison = a.pricing.coverPage - b.pricing.coverPage;
+                        break;
+                    case 'due-date':
+                        comparison = new Date(a.assetDueDate) - new Date(b.assetDueDate);
+                        break;
+                }
+                
+                return isAscending ? comparison : -comparison;
+            });
+            
+            displayCampaigns(sortedCampaigns);
+        }
+        
+        // Update the display function
+        function displayCampaigns(campaignsToDisplay) {
+            campaignsContainer.innerHTML = '';
+            
+            if (campaignsToDisplay.length === 0) {
+                campaignsContainer.classList.add('hidden');
+                return;
+            }
+            
+            campaignsContainer.classList.remove('hidden');
+            
+            campaignsToDisplay.forEach(campaign => {
+                const card = createCampaignCard(campaign);
+                campaignsContainer.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html> 

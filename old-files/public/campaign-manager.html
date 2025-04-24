@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MamaMag Campaign Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/main.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <img src="mamamag-logo.svg" alt="MamaMag Logo">
+                <h1>MamaMag Campaign Manager</h1>
+                <div id="auth-container" class="auth-container"></div>
+            </div>
+        </header>
+        
+        <div id="campaign-manager" class="hidden">
+            <!-- Existing campaign manager content -->
+        </div>
+        
+        <div id="login-required" class="login-required hidden">
+            <h2>Login Required</h2>
+            <p>Please sign in with your PostPilot email to access the campaign manager.</p>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { AuthComponent } from '/src/components/auth.js'
+        import { checkAuth } from '/src/supabase/auth.js'
+        
+        // Initialize auth
+        const auth = new AuthComponent()
+        
+        // Check auth status and show appropriate content
+        async function initializeApp() {
+            const { authenticated } = await checkAuth()
+            const campaignManager = document.getElementById('campaign-manager')
+            const loginRequired = document.getElementById('login-required')
+            
+            if (authenticated) {
+                campaignManager.classList.remove('hidden')
+                loginRequired.classList.add('hidden')
+                // Initialize campaign manager functionality
+            } else {
+                campaignManager.classList.add('hidden')
+                loginRequired.classList.remove('hidden')
+            }
+        }
+        
+        initializeApp()
+    </script>
+</body>
+</html> 
