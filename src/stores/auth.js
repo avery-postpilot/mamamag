@@ -19,6 +19,12 @@ export async function init() {
 
 // Sign in with Google
 export async function signInWithGoogle() {
+  // Determine if we're in production (Netlify) or development
+  const isProduction = window.location.hostname.includes('netlify.app');
+  const redirectUrl = isProduction 
+    ? 'https://mamamag-manager.netlify.app/auth/callback'
+    : `${window.location.protocol}//${window.location.hostname}:${window.location.port}/auth/callback`;
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -26,7 +32,7 @@ export async function signInWithGoogle() {
         access_type: 'offline',
         prompt: 'consent',
       },
-      redirectTo: `${window.location.protocol}//${window.location.hostname}:${window.location.port || '3001'}/auth/callback`
+      redirectTo: redirectUrl
     }
   })
   if (error) throw error
