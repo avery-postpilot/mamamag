@@ -77,18 +77,42 @@
           >
             <div class="submission-header">
               <div class="submission-info">
-                <h3>{{ submission.brand_name }}</h3>
-                <span class="design-status" :class="{ added: submission.added_to_design }">
-                  {{ submission.added_to_design ? 'Added to Design' : 'Pending Design' }}
-                </span>
+                <div class="brand-header">
+                  <div 
+                    v-if="submission.brand_logo_url" 
+                    class="brand-logo-container"
+                    @click="showImagePreview({ image_url: submission.brand_logo_url }, submission)"
+                  >
+                    <img 
+                      :src="getImageUrl(submission.brand_logo_url, submission.campaign_id)" 
+                      :alt="`${submission.brand_name} logo`"
+                      class="brand-logo"
+                    >
+                  </div>
+                  <div class="brand-details">
+                    <h3>{{ submission.brand_name }}</h3>
+                    <span class="design-status" :class="{ added: submission.added_to_design }">
+                      {{ submission.added_to_design ? 'Added to Design' : 'Pending Design' }}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <button 
-                class="btn" 
-                :class="{ success: submission.added_to_design }"
-                @click="toggleDesignStatus(submission)"
-              >
-                {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
-              </button>
+              <div class="submission-actions">
+                <button 
+                  class="btn" 
+                  :class="{ success: submission.added_to_design }"
+                  @click="toggleDesignStatus(submission)"
+                >
+                  {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
+                </button>
+                <button 
+                  class="btn secondary" 
+                  @click="downloadBrandLogo(submission)"
+                  :disabled="!submission.brand_logo_url"
+                >
+                  Download Logo
+                </button>
+              </div>
             </div>
 
             <div class="pages-list">
@@ -322,8 +346,8 @@ export default {
 
     // Helper functions
     const getImageUrl = (filename, campaignId) => {
-      if (!filename || !campaignId) {
-        console.log('Missing filename or campaignId:', { filename, campaignId })
+      if (!filename) {
+        console.log('Missing filename:', { filename, campaignId })
         return null
       }
       
@@ -332,12 +356,22 @@ export default {
         return filename
       }
 
+      // Check if this is a brand logo
+      if (filename.includes('logo')) {
+        // Clean up the filename to remove any duplicate paths
+        const cleanFilename = filename.replace(/^.*?logos\//, '')
+        // Construct the full Supabase URL for brand logos
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-logos/${campaignId}/logos/${cleanFilename}`
+        console.log('Generated brand logo URL:', url)
+        return url
+      }
+
       // Clean up the filename to remove any duplicate paths
       const cleanFilename = filename.replace(/^.*?products\//, '')
       
-      // Construct the full Supabase URL
+      // Construct the full Supabase URL for product images
       const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${campaignId}/products/${cleanFilename}`
-      console.log('Generated image URL:', url)
+      console.log('Generated product image URL:', url)
       return url
     }
 
@@ -490,6 +524,9 @@ export default {
         const campaignCopyContent = `Campaign: ${campaign.name}\n\nSubmissions:\n`
         campaignFolder.file('campaign_info.txt', campaignCopyContent)
 
+        // Create a logos folder
+        const logosFolder = campaignFolder.folder('brand_logos')
+
         // Process each submission
         for (const submission of campaign.submissions) {
           const submissionFolder = campaignFolder.folder(sanitizeFileName(submission.brand_name))
@@ -497,6 +534,22 @@ export default {
           // Add submission copy
           const copyContent = generateCopyContent(submission)
           submissionFolder.file('submission_info.txt', copyContent)
+
+          // Download and add brand logo if available
+          if (submission.brand_logo_url) {
+            try {
+              const logoUrl = getImageUrl(submission.brand_logo_url, submission.campaign_id)
+              const response = await fetch(logoUrl)
+              if (response.ok) {
+                const blob = await response.blob()
+                const fileName = `${sanitizeFileName(submission.brand_name)}_logo.${submission.brand_logo_url.split('.').pop()}`
+                logosFolder.file(fileName, blob)
+                submissionFolder.file(fileName, blob)
+              }
+            } catch (logoError) {
+              console.error(`Error downloading logo for ${submission.brand_name}:`, logoError)
+            }
+          }
 
           // Process each page
           for (const page of submission.selected_pages) {
@@ -613,6 +666,27 @@ Status: ${submission.status}
       }
     }
 
+    const downloadBrandLogo = async (submission) => {
+      try {
+        if (!submission.brand_logo_url) {
+          alert('No logo available for this brand')
+          return
+        }
+
+        const logoUrl = getImageUrl(submission.brand_logo_url, submission.campaign_id)
+        const response = await fetch(logoUrl)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const blob = await response.blob()
+        const fileName = `${sanitizeFileName(submission.brand_name)}_logo.${submission.brand_logo_url.split('.').pop()}`
+        saveAs(blob, fileName)
+      } catch (err) {
+        console.error('Error downloading brand logo:', err)
+        alert('Failed to download brand logo. Please try again.')
+      }
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -636,7 +710,8 @@ Status: ${submission.status}
       toggleDesignStatus,
       formatNumber,
       isCampaignActive,
-      toggleArchive
+      toggleArchive,
+      downloadBrandLogo
     }
   }
 }
@@ -1154,5 +1229,47 @@ Status: ${submission.status}
 
 .btn.success:hover {
   background: #218838;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.brand-logo-container {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eee;
+  transition: transform 0.2s ease;
+}
+
+.brand-logo-container:hover {
+  transform: scale(1.05);
+}
+
+.brand-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.brand-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style> 
