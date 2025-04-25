@@ -7,13 +7,23 @@
       </div>
       
       <div class="controls">
-        <div class="search-box">
-          <input 
-            type="text" 
-            v-model="searchQuery" 
-            placeholder="Search brands or products..."
-            @input="filterAssets"
-          >
+        <div class="filter-controls">
+          <div class="search-box">
+            <input 
+              type="text" 
+              v-model="searchQuery" 
+              placeholder="Search brands or products..."
+              @input="filterAssets"
+            >
+          </div>
+          <label class="show-archived">
+            <input 
+              type="checkbox" 
+              v-model="showArchived"
+              @change="filterAssets"
+            >
+            Show Archived Campaigns
+          </label>
         </div>
       </div>
     </header>
@@ -30,35 +40,55 @@
     <div v-else class="dashboard-content">
       <div v-for="campaign in filteredCampaigns" :key="campaign.id" class="campaign-section">
         <div class="campaign-header" @click="toggleCampaign(campaign.id)">
-          <h2>{{ campaign.name }}</h2>
+          <div class="campaign-info">
+            <div class="campaign-title">
+              <span class="toggle-icon">{{ isCampaignExpanded(campaign.id) ? '▼' : '▶' }}</span>
+              <h2>{{ campaign.name }}</h2>
+            </div>
+            <div class="campaign-badges">
+              <span class="campaign-status" :class="{ active: isCampaignActive(campaign) }">
+                {{ isCampaignActive(campaign) ? 'Active' : 'Closed' }}
+              </span>
+              <span v-if="campaign.archived" class="archive-badge">Archived</span>
+            </div>
+          </div>
           <div class="campaign-actions">
+            <button 
+              class="btn archive-btn" 
+              @click.stop="toggleArchive(campaign)"
+              :class="{ 'unarchive': campaign.archived }"
+            >
+              {{ campaign.archived ? 'Unarchive' : 'Archive' }}
+            </button>
             <button 
               class="btn primary" 
               @click.stop="downloadCampaignAssets(campaign)"
             >
-              Download All
+              Download All Assets
             </button>
-            <span class="toggle-icon">{{ isCampaignExpanded(campaign.id) ? '▼' : '▶' }}</span>
           </div>
         </div>
 
-        <div v-if="isCampaignExpanded(campaign.id)" class="assets-list">
+        <div v-if="isCampaignExpanded(campaign.id)" class="submission-sections">
           <div 
             v-for="submission in campaign.submissions" 
             :key="submission.id" 
             class="submission-section"
           >
             <div class="submission-header">
-              <h3>{{ submission.brand_name }}</h3>
-              <div class="submission-actions">
-                <button 
-                  class="btn" 
-                  :class="{ 'success': submission.added_to_design }"
-                  @click="toggleDesignStatus(submission)"
-                >
-                  {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
-                </button>
+              <div class="submission-info">
+                <h3>{{ submission.brand_name }}</h3>
+                <span class="design-status" :class="{ added: submission.added_to_design }">
+                  {{ submission.added_to_design ? 'Added to Design' : 'Pending Design' }}
+                </span>
               </div>
+              <button 
+                class="btn" 
+                :class="{ success: submission.added_to_design }"
+                @click="toggleDesignStatus(submission)"
+              >
+                {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
+              </button>
             </div>
 
             <div class="pages-list">
@@ -68,14 +98,20 @@
                 class="page-item"
               >
                 <div class="page-content">
-                  <div class="thumbnail-container" @click="showImagePreview(page, submission)">
+                  <div 
+                    class="thumbnail-container" 
+                    @click="showImagePreview(page, submission)"
+                  >
                     <img 
                       v-if="page.image_url" 
                       :src="getImageUrl(page.image_url, submission.campaign_id)" 
                       :alt="page.product_name || 'Product image'"
                       class="thumbnail"
                     >
-                    <div v-else class="no-image">No Image</div>
+                    <div v-else class="no-image">
+                      <span class="no-image-icon">📷</span>
+                      <span>No Image Available</span>
+                    </div>
                   </div>
                   
                   <div class="page-info">
@@ -83,22 +119,35 @@
                       <span class="page-number">Page {{ page.page_id }}</span>
                       <span class="layout-type">{{ page.layout }}</span>
                     </div>
+                    
                     <div class="product-details">
-                      <h4 class="product-name">{{ page.product_name || 'N/A' }}</h4>
-                      <p class="product-description">{{ page.product_description || 'N/A' }}</p>
+                      <h4 class="product-name">{{ page.product_name || 'Untitled Product' }}</h4>
+                      <p class="product-description">{{ page.product_description || 'No description available.' }}</p>
+                      <p class="price">${{ formatNumber(page.product_price) || 'Price not set' }}</p>
                       
                       <!-- Additional Products Section -->
-                      <div v-if="page.layout === 'multi-product' && page.additional_products?.length" class="additional-products">
+                      <div 
+                        v-if="page.layout === 'multi-product' && page.additional_products?.length" 
+                        class="additional-products"
+                      >
                         <h5>Additional Products</h5>
-                        <div v-for="(product, index) in page.additional_products" :key="index" class="additional-product">
-                          <div class="product-thumbnail" @click="showImagePreview(product, submission)">
+                        <div 
+                          v-for="(product, index) in page.additional_products" 
+                          :key="index" 
+                          class="additional-product"
+                        >
+                          <div 
+                            class="product-thumbnail" 
+                            @click="showImagePreview(product, submission)"
+                          >
                             <img 
                               v-if="product.image_url" 
                               :src="getImageUrl(product.image_url, submission.campaign_id)" 
                               :alt="product.name || 'Additional product'"
-                              class="thumbnail"
                             >
-                            <div v-else class="no-image">No Image</div>
+                            <div v-else class="no-image">
+                              <span>No Image</span>
+                            </div>
                           </div>
                           <div class="product-info">
                             <h6>{{ product.name }}</h6>
@@ -109,7 +158,10 @@
                       </div>
 
                       <!-- Text Content Section -->
-                      <div v-if="page.layout === 'text-image' && page.text_content" class="text-content">
+                      <div 
+                        v-if="page.layout === 'text-image' && page.text_content" 
+                        class="text-content"
+                      >
                         <h5>Article Text</h5>
                         <p>{{ page.text_content }}</p>
                       </div>
@@ -118,10 +170,10 @@
 
                   <div class="page-actions">
                     <button 
-                      class="btn small" 
+                      class="btn secondary" 
                       @click="downloadSingleAsset(page, submission)"
                     >
-                      Download
+                      Download Assets
                     </button>
                   </div>
                 </div>
@@ -156,6 +208,7 @@ export default {
     const submissions = ref([])
     const campaigns = ref([])
     const searchQuery = ref('')
+    const showArchived = ref(false)
     const expandedCampaigns = ref(new Set())
     const previewImage = ref(null)
     const previewImageAlt = ref('')
@@ -241,13 +294,14 @@ export default {
 
       const groups = {}
       
-      campaigns.value.forEach(campaign => {
-        groups[campaign.id] = {
-          id: campaign.id,
-          name: campaign.name,
-          submissions: []
-        }
-      })
+      campaigns.value
+        .filter(campaign => showArchived.value || !campaign.archived)
+        .forEach(campaign => {
+          groups[campaign.id] = {
+            ...campaign,
+            submissions: []
+          }
+        })
 
       filteredSubmissions.forEach(submission => {
         if (groups[submission.campaign_id]) {
@@ -257,7 +311,13 @@ export default {
 
       return Object.values(groups)
         .filter(group => group.submissions.length > 0)
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .sort((a, b) => {
+          // Sort by archived status first, then by name
+          if (a.archived === b.archived) {
+            return a.name.localeCompare(b.name)
+          }
+          return a.archived ? 1 : -1
+        })
     })
 
     // Helper functions
@@ -479,6 +539,7 @@ Layout: ${page.layout || 'N/A'}
 Reserved By: ${page.reserved_by || 'N/A'}
 Product Name: ${page.product_name || 'N/A'}
 Description: ${page.product_description || 'N/A'}
+Price: $${formatNumber(page.product_price) || 'N/A'}
 `
 
       // Add additional products if present
@@ -530,6 +591,28 @@ Status: ${submission.status}
       return num.toLocaleString('en-US')
     }
 
+    const isCampaignActive = (campaign) => {
+      // Implement the logic to determine if a campaign is active
+      return true // Placeholder, actual implementation needed
+    }
+
+    const toggleArchive = async (campaign) => {
+      try {
+        const { error } = await supabase
+          .from('campaigns')
+          .update({ archived: !campaign.archived })
+          .eq('id', campaign.id)
+
+        if (error) throw error
+
+        // Update local state
+        campaign.archived = !campaign.archived
+      } catch (err) {
+        console.error('Error toggling archive status:', err)
+        alert('Failed to update archive status. Please try again.')
+      }
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -541,6 +624,8 @@ Status: ${submission.status}
       filteredCampaigns,
       previewImage,
       previewImageAlt,
+      showArchived,
+      expandedCampaigns,
       toggleCampaign,
       isCampaignExpanded,
       getImageUrl,
@@ -549,7 +634,9 @@ Status: ${submission.status}
       downloadSingleAsset,
       downloadCampaignAssets,
       toggleDesignStatus,
-      formatNumber
+      formatNumber,
+      isCampaignActive,
+      toggleArchive
     }
   }
 }
@@ -583,6 +670,12 @@ Status: ${submission.status}
   gap: 20px;
 }
 
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .search-box input {
   width: 100%;
   padding: 10px;
@@ -591,11 +684,30 @@ Status: ${submission.status}
   font-size: 16px;
 }
 
+.show-archived {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  cursor: pointer;
+}
+
+.show-archived input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
 .campaign-section {
   margin-bottom: 30px;
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.campaign-section.archived {
+  opacity: 0.7;
 }
 
 .campaign-header {
@@ -614,8 +726,9 @@ Status: ${submission.status}
 }
 
 .toggle-icon {
-  font-size: 20px;
+  font-size: 12px;
   color: #666;
+  transition: transform 0.2s ease;
 }
 
 .assets-list {
@@ -644,109 +757,199 @@ Status: ${submission.status}
 }
 
 .pages-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
   padding: 15px;
 }
 
 .page-item {
-  margin-bottom: 15px;
+  margin-bottom: 0;
   border: 1px solid #eee;
-  border-radius: 4px;
+  border-radius: 8px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: box-shadow 0.2s ease;
+}
+
+.page-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .page-content {
   display: flex;
-  align-items: center;
-  gap: 15px;
+  flex-direction: column;
+  height: 100%;
 }
 
 .thumbnail-container {
-  height: 200px;
+  width: 100%;
+  height: 300px;
   background: #f8f9fa;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
 }
 
 .thumbnail {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.no-image {
-  color: #666;
-  font-size: 0.9em;
+.thumbnail:hover {
+  opacity: 0.9;
 }
 
 .page-info {
   flex: 1;
+  padding: 15px;
+  border-top: 1px solid #eee;
+  background: white;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
 }
 
 .page-number {
   font-weight: 600;
   color: #2c3e50;
+  font-size: 1.1em;
 }
 
 .layout-type {
   color: #007bff;
   font-size: 0.9em;
+  padding: 4px 8px;
+  background: #e7f3ff;
+  border-radius: 4px;
 }
 
 .product-details {
-  margin-top: 5px;
+  margin-top: 10px;
 }
 
 .product-name {
-  font-weight: 500;
-  margin-bottom: 5px;
+  font-weight: 600;
+  font-size: 1.1em;
+  margin-bottom: 8px;
+  color: #2c3e50;
 }
 
 .product-description {
   color: #666;
   font-size: 0.9em;
+  line-height: 1.5;
+  margin-bottom: 15px;
 }
 
-.page-actions {
-  display: flex;
-  gap: 10px;
-  padding: 10px;
+.product-details .price {
+  color: #28a745;
+  font-weight: 600;
+  font-size: 1.1em;
+  margin-bottom: 15px;
+}
+
+.additional-products {
+  margin-top: 15px;
+  padding-top: 15px;
   border-top: 1px solid #eee;
 }
 
-.btn {
-  padding: 8px 16px;
-  border: none;
+.additional-products h5 {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.additional-product {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.additional-product:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.product-thumbnail {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  background: #f8f9fa;
   border-radius: 4px;
+  overflow: hidden;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s;
 }
 
-.btn.primary {
-  background: #007bff;
-  color: white;
+.product-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.btn.success {
-  background-color: #28a745;
-  color: white;
+.product-info {
+  flex: 1;
 }
 
-.btn.success:hover {
-  background-color: #218838;
+.product-info h6 {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 5px;
 }
 
-.btn.small {
-  padding: 4px 8px;
+.product-info p {
+  color: #666;
   font-size: 0.9em;
+  line-height: 1.4;
+  margin-bottom: 5px;
+}
+
+.product-info .price {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.page-actions {
+  padding: 15px;
+  background: #f8f9fa;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.text-content {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+}
+
+.text-content h5 {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.text-content p {
+  color: #666;
+  font-size: 0.9em;
+  line-height: 1.6;
 }
 
 .loading-state {
@@ -822,5 +1025,134 @@ Status: ${submission.status}
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.campaign-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.campaign-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.campaign-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.campaign-status {
+  font-size: 0.9em;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #f8f9fa;
+  color: #666;
+}
+
+.campaign-status.active {
+  background: #e7f7ed;
+  color: #28a745;
+}
+
+.archive-badge {
+  background: #f8f9fa;
+  color: #666;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9em;
+}
+
+.archive-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.archive-btn:hover {
+  background: #5a6268;
+}
+
+.archive-btn.unarchive {
+  background: #28a745;
+}
+
+.archive-btn.unarchive:hover {
+  background: #218838;
+}
+
+.submission-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.design-status {
+  font-size: 0.85em;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #f8f9fa;
+  color: #666;
+}
+
+.design-status.added {
+  background: #e7f7ed;
+  color: #28a745;
+}
+
+.no-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #666;
+  font-size: 0.9em;
+  height: 100%;
+  background: #f8f9fa;
+}
+
+.no-image-icon {
+  font-size: 2em;
+  opacity: 0.5;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn.primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn.primary:hover {
+  background: #0056b3;
+}
+
+.btn.secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn.secondary:hover {
+  background: #5a6268;
+}
+
+.btn.success {
+  background: #28a745;
+  color: white;
+}
+
+.btn.success:hover {
+  background: #218838;
 }
 </style> 
