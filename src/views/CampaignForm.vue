@@ -924,200 +924,55 @@ export default {
     }
 
     const submitAssets = async () => {
-      if (!selectedPages.value.length) {
-        alert('Please select at least one page before submitting.')
-        return
-      }
-
-      loading.value = true
-      error.value = null
-
       try {
-        // Upload brand logo
-        let brandLogoUrl = null
-        if (formData.value.brandLogo) {
-          try {
-            const logoFile = formData.value.brandLogo
-            const logoFileName = `${formData.value.brandName.toLowerCase().replace(/\s+/g, '-')}-logo-${Date.now()}`
-            const logoExt = logoFile.name.split('.').pop()
-            console.log('Attempting to upload logo to bucket:', 'brand-logos')
-            
-            const { data: logoData, error: logoError } = await supabase.storage
-              .from('brand-logos')
-              .upload(`${campaign.value.id}/logos/${logoFileName}.${logoExt}`, logoFile)
+        loading.value = true
+        error.value = null
 
-            if (logoError) {
-              console.error('Logo upload error:', logoError)
-              throw new Error(`Logo upload failed: ${logoError.message}`)
-            }
-            
-            if (!logoData?.path) {
-              throw new Error('Logo upload failed: No path returned from storage')
-            }
+        // First, create or update the brand
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .upsert({
+            name: formData.brandName,
+            contact_name: formData.contactName,
+            contact_email: formData.contactEmail,
+            mailing_address: formData.mailingAddress,
+            brand_url: formData.brandUrl,
+            logo_url: formData.brandLogoUrl
+          }, {
+            onConflict: 'contact_email',
+            ignoreDuplicates: false
+          })
+          .select()
+          .single()
 
-            brandLogoUrl = logoData.path
-            console.log('Logo uploaded successfully:', brandLogoUrl)
-          } catch (err) {
-            console.error('Logo upload error:', err)
-            throw new Error(`Logo upload failed: ${err.message}`)
-          }
+        if (brandError) throw brandError
+
+        // Then proceed with the existing submission logic
+        const submissionData = {
+          campaign_id: campaign.value.id,
+          brand_id: brandData.id,
+          brand_name: formData.brandName,
+          contact_name: formData.contactName,
+          contact_email: formData.contactEmail,
+          mailing_address: formData.mailingAddress,
+          brand_url: formData.brandUrl,
+          brand_logo_url: formData.brandLogoUrl,
+          selected_pages: selectedPages.value.map(pageId => ({
+            page_id: pageId,
+            ...productForms.value[pageId]
+          }))
         }
 
-        // Process each selected page
-        for (const pageId of selectedPages.value) {
-          try {
-            const pageForm = productForms.value[pageId]
-            if (!pageForm) {
-              throw new Error(`No form data found for page ${pageId}`)
-            }
+        const { error: submissionError } = await supabase
+          .from('submissions')
+          .insert([submissionData])
 
-            // Handle multiple products or text content based on layout
-            let additionalData = {}
-            if (pageForm.layout === 'multi-product') {
-              // Process additional products asynchronously
-              const processedProducts = []
-              for (const product of pageForm.additionalProducts) {
-                const imageUrl = product.image 
-                  ? await uploadProductImage(product.image, pageId)
-                  : null
-                
-                processedProducts.push({
-                  name: product.name,
-                  price: parseFloat(product.price),
-                  description: product.description,
-                  image_url: imageUrl
-                })
-              }
-              
-              additionalData = {
-                additional_products: processedProducts
-              }
-            } else if (pageForm.layout === 'text-image') {
-              additionalData = {
-                text_content: pageForm.textContent
-              }
-            }
-
-            // Validate required page form fields
-            const requiredPageFields = {
-              productName: pageForm.productName,
-              productDescription: pageForm.productDescription,
-              productPrice: pageForm.productPrice,
-              layout: pageForm.layout
-            }
-
-            const missingPageFields = Object.entries(requiredPageFields)
-              .filter(([_, value]) => !value)
-              .map(([key]) => key)
-
-            if (missingPageFields.length > 0) {
-              throw new Error(`Missing required product fields: ${missingPageFields.join(', ')}`)
-            }
-
-            // Upload product image(s)
-            let productImageUrl = null
-            if (pageForm.productImages?.length > 0) {
-              try {
-                const imageFile = pageForm.productImages[0]
-                const imageFileName = `${pageForm.productName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
-                const imageExt = imageFile.name.split('.').pop()
-                console.log('Attempting to upload product image to bucket:', 'product-images')
-                
-                const { data: imageData, error: imageError } = await supabase.storage
-                  .from('product-images')
-                  .upload(`${campaign.value.id}/products/${imageFileName}.${imageExt}`, imageFile)
-
-                if (imageError) {
-                  console.error('Product image upload error:', imageError)
-                  throw new Error(`Product image upload failed: ${imageError.message}`)
-                }
-
-                if (!imageData?.path) {
-                  throw new Error('Product image upload failed: No path returned from storage')
-                }
-
-                productImageUrl = imageData.path
-                console.log('Product image uploaded successfully:', productImageUrl)
-              } catch (err) {
-                console.error('Product image upload error:', err)
-                throw new Error(`Product image upload failed: ${err.message}`)
-              }
-            } else {
-              throw new Error('Product image is required')
-            }
-
-            // Validate required submission fields
-            const requiredFields = {
-              campaign_id: campaign.value.id,
-              page_id: pageId,
-              brand_name: formData.value.brandName,
-              contact_name: formData.value.contactName,
-              contact_email: formData.value.contactEmail,
-              mailing_address: formData.value.mailingAddress,
-              brand_url: formData.value.brandUrl
-            }
-
-            const missingFields = Object.entries(requiredFields)
-              .filter(([_, value]) => !value)
-              .map(([key]) => key)
-
-            if (missingFields.length > 0) {
-              throw new Error(`Missing required fields: ${missingFields.join(', ')}`)
-            }
-
-            // Format the page data
-            const pageData = {
-              page_id: pageId,
-              layout: pageForm.layout,
-              product_name: pageForm.productName,
-              product_description: pageForm.productDescription,
-              product_price: parseFloat(pageForm.productPrice),
-              image_url: productImageUrl,
-              price: getPagePrice(pageId),
-              ...additionalData
-            }
-
-            // Calculate total price
-            const totalPrice = getPagePrice(pageId)
-            console.log('Calculated total price:', totalPrice)
-
-            // Prepare submission data
-            const submissionData = {
-              campaign_id: campaign.value.id,
-              page_id: pageId,
-              brand_name: formData.value.brandName,
-              contact_name: formData.value.contactName,
-              contact_email: formData.value.contactEmail,
-              mailing_address: formData.value.mailingAddress,
-              brand_url: formData.value.brandUrl,
-              brand_logo_url: brandLogoUrl,
-              selected_pages: [pageData],
-              total_price: totalPrice,
-              status: 'pending'
-            }
-
-            console.log('Submitting campaign data:', submissionData)
-            const { data: submission, error: submissionError } = await supabase
-              .from('campaign_submissions')
-              .insert(submissionData)
-              .select()
-
-            if (submissionError) {
-              console.error('Submission error details:', submissionError)
-              throw new Error(`Submission failed: ${submissionError.message}`)
-            }
-
-            console.log('Submission successful:', submission)
-          } catch (err) {
-            console.error('Error processing page:', pageId, err)
-            throw err
-          }
-        }
+        if (submissionError) throw submissionError
 
         submitted.value = true
       } catch (err) {
-        error.value = err.message
-        console.error('Submission process error:', err)
+        console.error('Error submitting assets:', err)
+        error.value = 'Failed to submit assets. Please try again.'
       } finally {
         loading.value = false
       }

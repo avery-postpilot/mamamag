@@ -1,5 +1,12 @@
-// Create a new table for page reservations
-const createPageReservationsTable = `
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Export the table creation SQL (if needed later)
+export const createPageReservationsTable = `
 CREATE TABLE IF NOT EXISTS page_reservations (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,

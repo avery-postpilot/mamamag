@@ -7,6 +7,7 @@ import AuthCallback from '../views/AuthCallback.vue'
 import PublicCampaigns from '../views/PublicCampaigns.vue'
 import AssetDashboard from '../views/AssetDashboard.vue'
 import CampaignLanding from '../views/CampaignLanding.vue'
+import BrandLookup from '../views/BrandLookup.vue'
 
 const routes = [
   {
@@ -40,6 +41,11 @@ const routes = [
     path: '/assets',
     name: 'asset-dashboard',
     component: AssetDashboard
+  },
+  {
+    path: '/brands',
+    name: 'brand-lookup',
+    component: BrandLookup
   }
 ]
 

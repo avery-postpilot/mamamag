@@ -3,7 +3,8 @@
     <nav v-if="user">
       <router-link to="/">Home</router-link> |
       <router-link to="/campaign-manager">Campaign Manager</router-link> |
-      <router-link to="/assets">Assets</router-link>
+      <router-link to="/assets">Assets</router-link> |
+      <router-link to="/brands">Brand Lookup</router-link>
       <button @click="handleSignOut">Sign Out</button>
     </nav>
     <router-view></router-view>

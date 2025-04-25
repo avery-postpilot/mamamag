@@ -117,7 +117,7 @@ export default {
         // Get current date in ISO format
         const currentDate = new Date().toISOString()
 
-        // Fetch campaigns where asset due date hasn't passed
+        // Fetch campaigns where asset due date hasn't passed and status is not archived
         const { data, error: err } = await supabase
           .from('campaigns')
           .select(`
@@ -133,7 +133,11 @@ export default {
 
         if (err) throw err
 
-        campaigns.value = data || []
+        // Additional filtering to ensure no campaigns with passed due dates
+        campaigns.value = (data || []).filter(campaign => {
+          const assetDueDate = new Date(campaign.asset_due_date)
+          return assetDueDate > new Date()
+        })
       } catch (err) {
         console.error('Error loading campaigns:', err)
         error.value = 'Failed to load campaigns. Please try again later.'
