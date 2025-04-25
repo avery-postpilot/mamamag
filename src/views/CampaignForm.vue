@@ -509,7 +509,7 @@ export default {
       const centerSpreadStart = totalPages / 2 // This will give us the center spread starting page
       const pricing = campaign.value.pricing || {}
 
-      // Front Cover (single) - doesn't count in page numbering
+      // Front Cover
       rows.push({
         type: 'single',
         pages: [{
@@ -517,7 +517,7 @@ export default {
           pageNumber: 'Cover',
           name: 'Front Cover',
           type: 'Premium',
-          basePrice: Number(pricing.frontCover || 0),
+          basePrice: pricing.frontCover,
           available: !reservedPages.value.has('front-cover'),
           reservedBy: reservedPages.value.get('front-cover'),
           layoutOptions: false
@@ -656,17 +656,17 @@ export default {
         ]
       })
 
-      // Back Cover
+      // Back Cover - Always reserved for brand logos
       rows.push({
         type: 'single',
         pages: [{
           id: 'back-cover',
-          pageNumber: totalPages.toString(), // Page 20 in a 20-page magazine
+          pageNumber: totalPages,
           name: 'Back Cover',
           type: 'Premium',
-          basePrice: Number(pricing.backCover || 0),
-          available: !reservedPages.value.has('back-cover'),
-          reservedBy: reservedPages.value.get('back-cover'),
+          basePrice: pricing.backCover,
+          available: false,
+          reservedBy: 'Reserved for Brand Logos',
           layoutOptions: false
         }]
       })
@@ -1234,6 +1234,12 @@ export default {
     }
 
     const handlePageClick = (page) => {
+      // Prevent clicking on back cover
+      if (page.id === 'back-cover') {
+        alert('The back cover is reserved for brand logos and cannot be selected.')
+        return
+      }
+
       if (!page.available) {
         alert(`This page has been reserved by ${page.reservedBy} and is unavailable for this campaign.`)
         return

@@ -14,6 +14,15 @@
         <button class="btn" @click="showNewCampaignForm = true">
           Create New Campaign
         </button>
+        <div class="filter-group">
+          <label>
+            <input 
+              type="checkbox" 
+              v-model="showArchived"
+              @change="loadCampaigns"
+            > Show Archived
+          </label>
+        </div>
       </div>
 
       <div v-if="loading" class="loading">
@@ -32,6 +41,7 @@
               <th>Pages</th>
               <th>Pages Filled</th>
               <th>Design Deadline</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -52,6 +62,11 @@
               </td>
               <td>{{ formatDate(calculateBusinessDays(campaign.assetDueDate, 5)) }}</td>
               <td>
+                <span class="status-badge" :class="'status-' + campaign.status.toLowerCase()">
+                  {{ campaign.status }}
+                </span>
+              </td>
+              <td>
                 <button @click="editCampaign(campaign)" class="btn btn-secondary">
                   Edit
                 </button>
@@ -63,6 +78,13 @@
                 </button>
                 <button @click="copyContactEmails(campaign.id)" class="btn btn-secondary">
                   Copy Emails
+                </button>
+                <button 
+                  @click="toggleArchiveCampaign(campaign)"
+                  class="btn btn-secondary"
+                  :class="{ 'btn-warning': campaign.status !== 'archived' }"
+                >
+                  {{ campaign.status === 'archived' ? 'Unarchive' : 'Archive' }}
                 </button>
               </td>
             </tr>
@@ -387,6 +409,7 @@ const showBrandsModal = ref(false)
 const selectedCampaign = ref(null)
 const filledPagesCounts = ref({})
 const modalSubmissions = ref([])
+const showArchived = ref(false)
 
 const defaultCampaignForm = {
   id: '',
@@ -419,10 +442,15 @@ onMounted(async () => {
 async function loadCampaigns() {
   try {
     console.log('Loading campaigns...')
-    const { data, error: err } = await supabase
+    const query = supabase
       .from('campaigns')
       .select('*')
-      .order('in_home_date', { ascending: true })
+      
+    if (!showArchived.value) {
+      query.neq('status', 'archived')
+    }
+    
+    const { data, error: err } = await query.order('in_home_date', { ascending: true })
 
     if (err) {
       console.error('Supabase error:', err)
@@ -680,6 +708,24 @@ async function copyContactEmails(campaignId) {
   }
 }
 
+async function toggleArchiveCampaign(campaign) {
+  try {
+    const newStatus = campaign.status === 'archived' ? 'active' : 'archived'
+    const { error: updateError } = await supabase
+      .from('campaigns')
+      .update({ status: newStatus })
+      .eq('id', campaign.id)
+
+    if (updateError) throw updateError
+
+    // Reload campaigns to reflect the change
+    await loadCampaigns()
+  } catch (err) {
+    console.error('Error toggling archive status:', err)
+    error.value = `Failed to update campaign status: ${err.message}`
+  }
+}
+
 // Define all functions and variables that need to be used in the template
 defineExpose({
   loading,
@@ -691,6 +737,7 @@ defineExpose({
   selectedCampaign,
   modalSubmissions,
   filledPagesCounts,
+  showArchived,
   editCampaign,
   saveCampaign,
   cancelEdit,
@@ -703,7 +750,8 @@ defineExpose({
   formatNumber,
   calculateBusinessDays,
   getFilledPagesCount,
-  copyContactEmails
+  copyContactEmails,
+  toggleArchiveCampaign
 })
 </script>
 
@@ -1001,5 +1049,38 @@ table td {
 
 .brand-item strong {
   color: #333;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.filter-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.status-archived {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-warning {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-warning:hover {
+  background-color: #bb2d3b;
+}
+
+.top-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style> 

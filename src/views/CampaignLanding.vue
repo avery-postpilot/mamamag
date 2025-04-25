@@ -1,65 +1,89 @@
 <template>
   <div class="landing-container">
-    <header>
-      <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
-      <h1>Upcoming Campaigns</h1>
-      <p>Reserve your spot in our upcoming issues</p>
-      <button @click="handleAdminLogin" class="admin-login-btn">
-        Admin Sign In
-      </button>
-    </header>
-
-    <div v-if="loading" class="loader">
-      <div class="spinner"></div>
-      <p>Loading campaigns...</p>
-    </div>
-
-    <div v-else-if="error" class="message error">
-      {{ error }}
-    </div>
-
-    <div v-else-if="!campaigns.length" class="message info">
-      No upcoming campaigns available at this time.
-    </div>
-
-    <div v-else class="campaigns-grid">
-      <div v-for="campaign in campaigns" 
-           :key="campaign.id" 
-           class="campaign-card"
-           @click="navigateToCampaign(campaign.id)">
-        <div class="campaign-header">
-          <h2>{{ campaign.name }}</h2>
-          <span class="campaign-status" :class="{ 'active': isCampaignActive(campaign) }">
-            {{ isCampaignActive(campaign) ? 'Open for Reservations' : 'Coming Soon' }}
-          </span>
-        </div>
-        
-        <div class="campaign-details">
-          <div class="detail-item">
-            <span class="label">Distribution:</span>
-            <span class="value">{{ formatNumber(campaign.volume) }} copies</span>
-          </div>
-          <div class="detail-item">
-            <span class="label">In-Home Date:</span>
-            <span class="value">{{ formatDate(campaign.in_home_date) }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="label">Asset Due Date:</span>
-            <span class="value">{{ formatDate(campaign.asset_due_date) }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="label">Available Pages:</span>
-            <span class="value">{{ getAvailablePages(campaign) }} of {{ campaign.page_count }}</span>
-          </div>
-        </div>
-
-        <div class="campaign-cta">
-          <button class="btn" :disabled="!isCampaignActive(campaign)">
-            {{ isCampaignActive(campaign) ? 'Reserve Your Spot' : 'Coming Soon' }}
+    <div class="main-content">
+      <header>
+        <div class="admin-login">
+          <button @click="handleAdminLogin" class="admin-login-btn">
+            Admin Sign In
           </button>
+        </div>
+        <div class="header-content">
+          <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
+          <h1>Upcoming Campaigns</h1>
+          <p>Reserve your spot in our upcoming issues</p>
+        </div>
+      </header>
+
+      <div v-if="loading" class="loader">
+        <div class="spinner"></div>
+        <p>Loading campaigns...</p>
+      </div>
+
+      <div v-else-if="error" class="message error">
+        {{ error }}
+      </div>
+
+      <div v-else-if="!campaigns.length" class="message info">
+        No upcoming campaigns available at this time.
+      </div>
+
+      <div v-else class="campaigns-grid">
+        <div v-for="campaign in campaigns" 
+             :key="campaign.id" 
+             class="campaign-card"
+             @click="navigateToCampaign(campaign.id)">
+          <div class="campaign-header">
+            <h2>{{ campaign.name }}</h2>
+            <span class="campaign-status" :class="{ 'active': isCampaignActive(campaign) }">
+              {{ isCampaignActive(campaign) ? 'Open for Reservations' : 'Coming Soon' }}
+            </span>
+          </div>
+          
+          <div class="campaign-details">
+            <div class="detail-item">
+              <span class="label">Distribution:</span>
+              <span class="value">{{ formatNumber(campaign.volume) }} copies</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">In-Home Date:</span>
+              <span class="value">{{ formatDate(campaign.in_home_date) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Asset Due Date:</span>
+              <span class="value">{{ formatDate(campaign.asset_due_date) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Available Pages:</span>
+              <span class="value">{{ getAvailablePages(campaign) }} of {{ campaign.page_count }}</span>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button 
+              class="primary" 
+              :disabled="!isCampaignActive(campaign)"
+              @click.stop="navigateToCampaign(campaign.id)">
+              {{ isCampaignActive(campaign) ? 'Reserve Spot' : 'Coming Soon' }}
+            </button>
+            <button 
+              class="secondary" 
+              @click.stop="navigateToCampaign(campaign.id)">
+              View Form
+            </button>
+          </div>
         </div>
       </div>
     </div>
+
+    <footer>
+      <div class="footer-content">
+        <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo" class="footer-logo">
+        <div class="footer-text">
+          <p>Copyright © 2025 PostPilot</p>
+          <p>For questions, please contact <a href="mailto:avery@postpilot.com">avery@postpilot.com</a></p>
+        </div>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -103,6 +127,7 @@ export default {
               selected_pages
             )
           `)
+          .neq('status', 'archived')
           .gte('asset_due_date', currentDate)
           .order('in_home_date', { ascending: true })
 
@@ -187,11 +212,31 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
 }
 
 header {
-  text-align: center;
   margin-bottom: 3rem;
+  position: relative;
+  text-align: center;
+
+  .admin-login {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
   
   img {
     max-width: 250px;
@@ -219,7 +264,6 @@ header {
     font-size: 1rem;
     cursor: pointer;
     transition: background-color 0.3s;
-    margin-top: 1rem;
 
     &:hover {
       background-color: #ff45a1;
@@ -295,28 +339,46 @@ header {
     }
   }
 
-  .campaign-cta {
-    text-align: center;
+  .button-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
 
-    .btn {
-      width: 100%;
-      padding: 0.75rem;
-      font-size: 1rem;
-      font-weight: 500;
-      border-radius: 5px;
-      background: var(--primary-color);
-      color: white;
+    button {
+      flex: 1;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      border-radius: 4px;
       border: none;
       cursor: pointer;
-      transition: background-color 0.3s ease;
-
-      &:hover:not(:disabled) {
-        background: #ff45a1;
+      transition: all 0.2s ease;
+      font-weight: 500;
+      
+      &.primary {
+        background: var(--primary-color);
+        color: white;
+        
+        &:hover {
+          background: #ff45a1;
+        }
       }
-
-      &:disabled {
-        background: #ccc;
-        cursor: not-allowed;
+      
+      &.secondary {
+        background: #f0f0f0;
+        color: #666;
+        
+        &:hover {
+          background: #e0e0e0;
+        }
+      }
+      
+      &.danger {
+        background: #dc3545;
+        color: white;
+        
+        &:hover {
+          background: #c82333;
+        }
       }
     }
   }
@@ -359,13 +421,65 @@ header {
   100% { transform: rotate(360deg); }
 }
 
+footer {
+  margin-top: auto;
+  padding: 2rem 0;
+  border-top: 1px solid #eee;
+
+  .footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+
+    .footer-logo {
+      max-width: 100px;
+      height: auto;
+    }
+
+    .footer-text {
+      text-align: right;
+      color: #666;
+      font-size: 0.9rem;
+
+      p {
+        margin: 0.25rem 0;
+      }
+
+      a {
+        color: #ff69b4;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .landing-container {
     padding: 1rem;
   }
 
-  .campaigns-grid {
-    grid-template-columns: 1fr;
+  header {
+    .admin-login {
+      position: static;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+  }
+
+  footer {
+    .footer-content {
+      flex-direction: column;
+      text-align: center;
+
+      .footer-text {
+        text-align: center;
+      }
+    }
   }
 }
 </style> 
