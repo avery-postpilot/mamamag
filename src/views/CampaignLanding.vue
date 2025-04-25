@@ -4,6 +4,9 @@
       <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
       <h1>Upcoming Campaigns</h1>
       <p>Reserve your spot in our upcoming issues</p>
+      <button @click="handleAdminLogin" class="admin-login-btn">
+        Admin Sign In
+      </button>
     </header>
 
     <div v-if="loading" class="loader">
@@ -64,6 +67,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
+import { signInWithGoogle } from '@/stores/auth'
 
 export default {
   name: 'CampaignLanding',
@@ -72,6 +76,14 @@ export default {
     const campaigns = ref([])
     const loading = ref(true)
     const error = ref(null)
+
+    const handleAdminLogin = async () => {
+      try {
+        await signInWithGoogle()
+      } catch (error) {
+        console.error('Error signing in:', error)
+      }
+    }
 
     const loadCampaigns = async () => {
       try {
@@ -163,7 +175,8 @@ export default {
       getAvailablePages,
       formatDate,
       formatNumber,
-      navigateToCampaign
+      navigateToCampaign,
+      handleAdminLogin
     }
   }
 }
@@ -194,6 +207,23 @@ header {
   p {
     color: #666;
     font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .admin-login-btn {
+    background-color: #ff69b4;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-top: 1rem;
+
+    &:hover {
+      background-color: #ff45a1;
+    }
   }
 }
 

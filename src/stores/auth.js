@@ -26,7 +26,7 @@ export async function signInWithGoogle() {
         access_type: 'offline',
         prompt: 'consent',
       },
-      redirectTo: window.location.origin + '/auth/callback'
+      redirectTo: `${window.location.protocol}//${window.location.hostname}:${window.location.port || '3001'}/auth/callback`
     }
   })
   if (error) throw error
