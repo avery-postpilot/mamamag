@@ -5,6 +5,8 @@
       <h1>MamaMag Campaign Portal</h1>
     </header>
 
+    <MagazinePreview class="preview-section" />
+    
     <div class="content">
       <div v-if="!user" class="login-section">
         <h2>Welcome to MamaMag Campaign Portal</h2>
@@ -32,6 +34,7 @@
 
 <script setup>
 import { user, signInWithGoogle, signOut, isAuthorizedUser } from '../stores/auth'
+import MagazinePreview from '../components/magazine/MagazinePreview.vue'
 
 async function handleLogin() {
   try {
@@ -71,6 +74,11 @@ header h1 {
   color: #ff69b4;
   font-size: 2.5rem;
   margin: 0;
+}
+
+.preview-section {
+  margin: 40px 0;
+  text-align: center;
 }
 
 .content {

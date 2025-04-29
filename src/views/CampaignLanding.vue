@@ -11,8 +11,17 @@
           <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
           <h1>Upcoming Campaigns</h1>
           <p>Reserve your spot in our upcoming issues</p>
+          <button @click="showPreview" class="preview-button">Preview MamaMag</button>
         </div>
       </header>
+
+      <!-- Preview Modal -->
+      <div v-if="showPreviewModal" class="preview-modal" @click.self="closePreview">
+        <div class="modal-content">
+          <button class="close-button" @click="closePreview">&times;</button>
+          <MagazineFlipbook />
+        </div>
+      </div>
 
       <div v-if="loading" class="loader">
         <div class="spinner"></div>
@@ -92,14 +101,19 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabaseClient'
 import { signInWithGoogle } from '@/stores/auth'
+import MagazineFlipbook from '@/components/magazine/MagazineFlipbook.vue'
 
 export default {
   name: 'CampaignLanding',
+  components: {
+    MagazineFlipbook
+  },
   setup() {
     const router = useRouter()
     const campaigns = ref([])
     const loading = ref(true)
     const error = ref(null)
+    const showPreviewModal = ref(false)
 
     const handleAdminLogin = async () => {
       try {
@@ -192,6 +206,14 @@ export default {
       router.push(`/campaign/${campaignId}`)
     }
 
+    const showPreview = () => {
+      showPreviewModal.value = true
+    }
+
+    const closePreview = () => {
+      showPreviewModal.value = false
+    }
+
     onMounted(() => {
       loadCampaigns()
     })
@@ -205,7 +227,10 @@ export default {
       formatDate,
       formatNumber,
       navigateToCampaign,
-      handleAdminLogin
+      handleAdminLogin,
+      showPreview,
+      closePreview,
+      showPreviewModal
     }
   }
 }
@@ -484,6 +509,77 @@ footer {
         text-align: center;
       }
     }
+  }
+}
+
+.preview-section {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.preview-button {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background-color: var(--primary-color, #ff69b4);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+
+  &:hover {
+    background-color: var(--primary-hover, #ff4da6);
+  }
+}
+
+.preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  width: 95%;
+  height: 95%;
+  background: #f5f5f5;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.close-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 24px;
+  color: #333;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    background: white;
+    color: #000;
   }
 }
 </style> 

@@ -21,10 +21,23 @@
             <p><strong>Audience:</strong> {{ campaign.audience }}</p>
             <p><strong>Page Count:</strong> {{ campaign.pageCount }}</p>
           </div>
-          <router-link :to="'/campaign/' + campaign.id" class="submit-button">
-            Submit Assets
-          </router-link>
+          <div class="button-group">
+            <router-link :to="'/campaign/' + campaign.id" class="submit-button">
+              Submit Assets
+            </router-link>
+            <button @click="showPreview" class="preview-button">
+              Preview MamaMag
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div v-if="showPreviewModal" class="preview-modal" @click.self="closePreview">
+      <div class="modal-content">
+        <button class="close-button" @click="closePreview">&times;</button>
+        <MagazineFlipbook />
       </div>
     </div>
   </div>
@@ -33,10 +46,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../lib/supabaseClient'
+import MagazineFlipbook from '../components/magazine/MagazineFlipbook.vue'
 
 const campaigns = ref([])
 const loading = ref(true)
 const error = ref(null)
+const showPreviewModal = ref(false)
 
 onMounted(async () => {
   try {
@@ -62,6 +77,14 @@ function formatDate(dateString) {
     month: 'long',
     day: 'numeric'
   })
+}
+
+function showPreview() {
+  showPreviewModal.value = true
+}
+
+function closePreview() {
+  showPreviewModal.value = false
 }
 </script>
 
@@ -143,5 +166,63 @@ header h1 {
   color: #721c24;
   background-color: #f8d7da;
   border-radius: 4px;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.preview-button {
+  background-color: var(--secondary-color);
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.preview-button:hover {
+  background-color: var(--secondary-hover);
+}
+
+.preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  width: 90%;
+  height: 90%;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #333;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.close-button:hover {
+  color: #000;
 }
 </style> 
