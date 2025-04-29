@@ -64,8 +64,8 @@
         </div>
 
         <div class="form-group">
-          <label for="brand-url" class="required">Brand URL</label>
-          <input type="url" id="brand-url" v-model="formData.brandUrl" placeholder="https://yourbrand.com" required>
+          <label for="brand-website" class="required">Brand Website</label>
+          <input type="url" id="brand-website" v-model="formData.brandWebsite" placeholder="https://yourbrand.com" required>
         </div>
       </div>
 
@@ -459,8 +459,9 @@ export default {
       contactName: '',
       contactEmail: '',
       mailingAddress: '',
-      brandUrl: '',
-      brandLogo: null
+      brandWebsite: '',
+      brandLogo: null,
+      brandLogoUrl: null
     })
 
     const layoutOptions = {
@@ -928,43 +929,128 @@ export default {
         loading.value = true
         error.value = null
 
-        // First, create or update the brand
-        const { data: brandData, error: brandError } = await supabase
+        // Validate required fields
+        if (!formData.value || !formData.value.contactEmail) {
+          throw new Error('Contact email is required')
+        }
+
+        // First, check if brand exists
+        const { data: existingBrand, error: searchError } = await supabase
           .from('brands')
-          .upsert({
-            name: formData.brandName,
-            contact_name: formData.contactName,
-            contact_email: formData.contactEmail,
-            mailing_address: formData.mailingAddress,
-            brand_url: formData.brandUrl,
-            logo_url: formData.brandLogoUrl
-          }, {
-            onConflict: 'contact_email',
-            ignoreDuplicates: false
-          })
           .select()
+          .eq('contactEmail', formData.value.contactEmail)
           .single()
 
-        if (brandError) throw brandError
+        if (searchError && searchError.code !== 'PGRST116') {
+          console.error('Search error:', searchError)
+          throw searchError
+        }
 
-        // Then proceed with the existing submission logic
+        let brandData
+        if (existingBrand) {
+          // Update existing brand
+          const { data: updatedBrand, error: updateError } = await supabase
+            .from('brands')
+            .update({
+              name: formData.value.brandName,
+              contactName: formData.value.contactName
+            })
+            .eq('id', existingBrand.id)
+            .select()
+            .single()
+
+          if (updateError) {
+            console.error('Update error:', updateError)
+            throw updateError
+          }
+          brandData = updatedBrand
+        } else {
+          // Insert new brand
+          const { data: newBrand, error: insertError } = await supabase
+            .from('brands')
+            .insert({
+              name: formData.value.brandName,
+              contactName: formData.value.contactName,
+              contactEmail: formData.value.contactEmail
+            })
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('Insert error:', insertError)
+            throw insertError
+          }
+          brandData = newBrand
+        }
+
+        // Upload logo first if provided
+        let brandLogoUrl = null
+        if (formData.value.brandLogo) {
+          try {
+            const fileName = `${Date.now()}-${formData.value.brandLogo.name}`
+            const { data: logoData, error: logoError } = await supabase.storage
+              .from('brand-logos')
+              .upload(`${campaign.value.id}/logos/${fileName}`, formData.value.brandLogo)
+
+            if (logoError) throw logoError
+
+            // Get the public URL for the uploaded logo
+            const { data: { publicUrl } } = supabase.storage
+              .from('brand-logos')
+              .getPublicUrl(`${campaign.value.id}/logos/${fileName}`)
+
+            brandLogoUrl = publicUrl
+          } catch (uploadError) {
+            console.error('Error uploading logo:', uploadError)
+            throw new Error('Failed to upload brand logo: ' + uploadError.message)
+          }
+        }
+
+        // Then proceed with the campaign submission
         const submissionData = {
           campaign_id: campaign.value.id,
-          brand_id: brandData.id,
-          brand_name: formData.brandName,
-          contact_name: formData.contactName,
-          contact_email: formData.contactEmail,
-          mailing_address: formData.mailingAddress,
-          brand_url: formData.brandUrl,
-          brand_logo_url: formData.brandLogoUrl,
+          brand_name: formData.value.brandName,
+          contact_name: formData.value.contactName,
+          contact_email: formData.value.contactEmail,
+          mailing_address: formData.value.mailingAddress,
+          brand_url: formData.value.brandWebsite,
+          brand_logo_url: brandLogoUrl,
           selected_pages: selectedPages.value.map(pageId => ({
             page_id: pageId,
-            ...productForms.value[pageId]
-          }))
+            layout: productForms.value[pageId].layout,
+            product_name: productForms.value[pageId].productName,
+            product_description: productForms.value[pageId].productDescription,
+            product_price: parseFloat(productForms.value[pageId].productPrice),
+            image_url: null // Will be updated after image upload
+          })),
+          total_price: calculateTotalPrice(),
+          status: 'pending',
+          layout_type: productForms.value[selectedPages.value[0]].layout,
+          page_id: selectedPages.value[0],
+          added_to_design: false,
+          additional_products: productForms.value[selectedPages.value[0]].additionalProducts || [],
+          text_content: productForms.value[selectedPages.value[0]].textContent || null
+        }
+
+        // Upload images first
+        try {
+          for (const pageId of selectedPages.value) {
+            const form = productForms.value[pageId]
+            if (form.productImages && form.productImages.length > 0) {
+              const imagePath = await uploadProductImage(form.productImages[0], pageId)
+              const pageIndex = submissionData.selected_pages.findIndex(p => p.page_id === pageId)
+              if (pageIndex !== -1) {
+                submissionData.selected_pages[pageIndex].image_url = imagePath
+              }
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error uploading images:', uploadError)
+          throw new Error('Failed to upload product images: ' + uploadError.message)
         }
 
         const { error: submissionError } = await supabase
-          .from('submissions')
+          .from('campaign_submissions')
           .insert([submissionData])
 
         if (submissionError) throw submissionError
