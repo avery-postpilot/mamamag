@@ -1,0 +1,9 @@
+column_name,data_type,is_nullable
+id,uuid,NO
+invite_code,character varying,NO
+brand_name,character varying,NO
+created_at,timestamp with time zone,NO
+last_accessed,timestamp with time zone,YES
+is_used,boolean,NO
+used_by,character varying,YES
+used_at,timestamp with time zone,YES 

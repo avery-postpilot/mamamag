@@ -1,7 +1,9 @@
 <template>
   <div class="campaign-manager">
     <header>
-      <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
+      <router-link to="/">
+        <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
+      </router-link>
       <h1>MamaMag Campaign Manager</h1>
       <p>Create and manage your MamaMag campaigns</p>
     </header>

@@ -148,6 +148,7 @@
                       <h4 class="product-name">{{ page.product_name || 'Untitled Product' }}</h4>
                       <p class="product-description">{{ page.product_description || 'No description available.' }}</p>
                       <p class="price">${{ formatNumber(page.product_price) || 'Price not set' }}</p>
+                      <p v-if="page.discount_code" class="discount-code">{{ page.discount_code }}</p>
                       
                       <!-- Additional Products Section -->
                       <div 
@@ -593,6 +594,7 @@ Reserved By: ${page.reserved_by || 'N/A'}
 Product Name: ${page.product_name || 'N/A'}
 Description: ${page.product_description || 'N/A'}
 Price: $${formatNumber(page.product_price) || 'N/A'}
+${page.discount_code ? `Discount Code: ${page.discount_code}` : ''}
 `
 
       // Add additional products if present
@@ -1271,5 +1273,15 @@ Status: ${submission.status}
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.discount-code {
+  color: #4CAF50;
+  font-weight: 500;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background-color: #E8F5E9;
+  border-radius: 4px;
+  display: inline-block;
 }
 </style> 

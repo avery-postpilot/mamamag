@@ -1,0 +1,21 @@
+column_name,data_type,is_nullable
+id,uuid,NO
+campaign_id,uuid,YES
+brand_name,character varying,NO
+contact_name,character varying,NO
+contact_email,character varying,NO
+mailing_address,text,NO
+brand_logo_url,text,YES
+brand_website,text,YES
+selected_pages,jsonb,NO
+total_price,numeric,NO
+status,character varying,YES
+created_at,timestamp with time zone,YES
+updated_at,timestamp with time zone,YES
+brand_url,text,YES
+product_image_url,text,YES
+layout_type,character varying,NO
+page_id,character varying,NO
+added_to_design,boolean,NO
+additional_products,jsonb,YES
+text_content,text,YES

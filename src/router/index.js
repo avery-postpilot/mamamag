@@ -8,12 +8,20 @@ import PublicCampaigns from '../views/PublicCampaigns.vue'
 import AssetDashboard from '../views/AssetDashboard.vue'
 import CampaignLanding from '../views/CampaignLanding.vue'
 import BrandLookup from '../views/BrandLookup.vue'
+import InviteCodeVerification from '../components/InviteCodeVerification.vue'
+import InviteCodeAdmin from '../components/InviteCodeAdmin.vue'
 
 const routes = [
   {
     path: '/',
+    name: 'invite-code',
+    component: InviteCodeVerification
+  },
+  {
+    path: '/landing',
     name: 'landing',
-    component: CampaignLanding
+    component: CampaignLanding,
+    meta: { requiresInviteCode: true }
   },
   {
     path: '/campaign-manager',
@@ -46,6 +54,12 @@ const routes = [
     path: '/brands',
     name: 'brand-lookup',
     component: BrandLookup
+  },
+  {
+    path: '/admin/invite-codes',
+    name: 'invite-code-admin',
+    component: InviteCodeAdmin,
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -56,11 +70,22 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
+  // Check for admin authentication
   if (to.meta.requiresAuth && !isAuthorizedUser()) {
     next('/')
-  } else {
-    next()
+    return
   }
+
+  // Check for invite code
+  if (to.meta.requiresInviteCode) {
+    const brandInfo = localStorage.getItem('brandInfo')
+    if (!brandInfo) {
+      next('/')
+      return
+    }
+  }
+
+  next()
 })
 
 export default router 

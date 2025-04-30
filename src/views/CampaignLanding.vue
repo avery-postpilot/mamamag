@@ -8,9 +8,14 @@
           </button>
         </div>
         <div class="header-content">
-          <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
+          <router-link to="/">
+            <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo">
+          </router-link>
           <h1>Upcoming Campaigns</h1>
           <p>Reserve your spot in our upcoming issues</p>
+          <div v-if="brandName" class="welcome-message">
+            Welcome, {{ brandName }}
+          </div>
           <button @click="showPreview" class="preview-button">Preview MamaMag</button>
         </div>
       </header>
@@ -86,7 +91,9 @@
 
     <footer>
       <div class="footer-content">
-        <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo" class="footer-logo">
+        <router-link to="/">
+          <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo" class="footer-logo">
+        </router-link>
         <div class="footer-text">
           <p>Copyright © 2025 PostPilot</p>
           <p>For questions, please contact <a href="mailto:avery@postpilot.com">avery@postpilot.com</a></p>
@@ -114,12 +121,41 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const showPreviewModal = ref(false)
+    const brandName = ref('')
+    const existingBrandInfo = ref(null)
 
     const handleAdminLogin = async () => {
       try {
         await signInWithGoogle()
       } catch (error) {
         console.error('Error signing in:', error)
+      }
+    }
+
+    const loadBrandInfo = () => {
+      const brandInfo = localStorage.getItem('brandInfo')
+      if (brandInfo) {
+        const { brandName: name, inviteCode } = JSON.parse(brandInfo)
+        brandName.value = name
+        fetchExistingBrandInfo(name)
+      }
+    }
+
+    const fetchExistingBrandInfo = async (brandName) => {
+      try {
+        const { data, error: err } = await supabase
+          .from('campaign_submissions')
+          .select('*')
+          .eq('brand_name', brandName)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (err) throw err
+        if (data && data.length > 0) {
+          existingBrandInfo.value = data[0]
+        }
+      } catch (err) {
+        console.error('Error fetching brand info:', err)
       }
     }
 
@@ -203,7 +239,20 @@ export default {
     }
 
     const navigateToCampaign = (campaignId) => {
-      router.push(`/campaign/${campaignId}`)
+      if (existingBrandInfo.value) {
+        router.push({
+          path: `/campaign/${campaignId}`,
+          query: { 
+            brandName: existingBrandInfo.value.brand_name,
+            contactName: existingBrandInfo.value.contact_name,
+            contactEmail: existingBrandInfo.value.contact_email,
+            mailingAddress: existingBrandInfo.value.mailing_address,
+            brandWebsite: existingBrandInfo.value.brand_website
+          }
+        })
+      } else {
+        router.push(`/campaign/${campaignId}`)
+      }
     }
 
     const showPreview = () => {
@@ -215,6 +264,7 @@ export default {
     }
 
     onMounted(() => {
+      loadBrandInfo()
       loadCampaigns()
     })
 
@@ -230,7 +280,8 @@ export default {
       handleAdminLogin,
       showPreview,
       closePreview,
-      showPreviewModal
+      showPreviewModal,
+      brandName
     }
   }
 }
@@ -581,5 +632,12 @@ footer {
     background: white;
     color: #000;
   }
+}
+
+.welcome-message {
+  margin: 1rem 0;
+  font-size: 1.2rem;
+  color: #4a5568;
+  font-weight: 500;
 }
 </style> 

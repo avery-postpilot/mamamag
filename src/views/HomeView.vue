@@ -1,7 +1,11 @@
 <template>
   <div class="home">
     <header>
-      <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo" class="logo">
+      <div class="logo-container">
+        <router-link to="/">
+          <img src="../assets/mamamag-logo.svg" alt="MamaMag Logo" class="logo">
+        </router-link>
+      </div>
       <h1>Welcome to MamaMag Campaign Portal</h1>
     </header>
 

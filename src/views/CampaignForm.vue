@@ -47,11 +47,6 @@
         </div>
 
         <div class="form-group">
-          <label for="mailing-address" class="required">Mailing Address</label>
-          <textarea id="mailing-address" v-model="formData.mailingAddress" rows="3" required></textarea>
-        </div>
-
-        <div class="form-group">
           <label for="brand-logo" class="required">Brand Logo</label>
           <div class="file-upload">
             <label for="brand-logo">
@@ -74,6 +69,15 @@
         <div class="magazine-section">
           <h2>Select Your Placement(s)</h2>
           <p>Choose from our premium cover positions or standard pages with three beautiful layout options to showcase your brand.</p>
+          <button @click="showPreview" class="preview-button">Preview MamaMag</button>
+        </div>
+
+        <!-- Preview Modal -->
+        <div v-if="showPreviewModal" class="preview-modal" @click.self="closePreview">
+          <div class="modal-content">
+            <button class="close-button" @click="closePreview">&times;</button>
+            <MagazineFlipbook />
+          </div>
         </div>
 
         <div class="magazine-layout">
@@ -212,6 +216,14 @@
                     <div class="char-counter">{{ productForms[pageId].productDescription?.length || 0 }}/75 characters</div>
                   </div>
                   <div class="form-group">
+                    <label>Discount/Coupon Code</label>
+                    <input 
+                      type="text" 
+                      v-model="productForms[pageId].discountCode"
+                      placeholder="Optional: Add a discount or coupon code"
+                    >
+                  </div>
+                  <div class="form-group">
                     <label :for="'product-images-' + pageId" class="required">Product Images</label>
                     <div class="file-upload">
                       <input 
@@ -323,7 +335,7 @@
       <div class="card summary-section">
         <h2>Your Selected Placements</h2>
         <div class="pricing-notice">
-          <p><strong>Please Note:</strong> The prices shown are suggested prices based on our standard rate card. Any previously negotiated volume discounts or special rates will be honored when you are invoiced. If you have questions about pricing or want to discuss rates, please contact your account manager.</p>
+          <p><strong>Please Note:</strong> The prices shown are suggested prices based on our standard rate card. You will not be charged by submitting this reservation.</p>
         </div>
 
         <div id="empty-selection-message" v-if="!selectedPages.length">
@@ -434,18 +446,29 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase, checkStorage } from '@/lib/supabaseClient'
+import MagazineFlipbook from '@/components/magazine/MagazineFlipbook.vue'
 
 export default {
   name: 'CampaignForm',
-  setup() {
+  components: {
+    MagazineFlipbook
+  },
+  props: {
+    id: {
+      type: String,
+      required: true
+    }
+  },
+  setup(props) {
     const route = useRoute()
     const campaign = ref(null)
     const loading = ref(true)
     const error = ref(null)
     const submitted = ref(false)
+    const showPreviewModal = ref(false)
     const showPlacementModal = ref(false)
     const selectedPages = ref([])
     const productForms = ref({})
@@ -458,10 +481,11 @@ export default {
       brandName: '',
       contactName: '',
       contactEmail: '',
-      mailingAddress: '',
       brandWebsite: '',
       brandLogo: null,
-      brandLogoUrl: null
+      brandLogoUrl: null,
+      selectedPages: [],
+      totalPrice: 0
     })
 
     const layoutOptions = {
@@ -675,6 +699,14 @@ export default {
       return rows
     })
 
+    const loadPrefilledData = () => {
+      const query = route.query
+      if (query.brandName) formData.value.brandName = query.brandName
+      if (query.contactName) formData.value.contactName = query.contactName
+      if (query.contactEmail) formData.value.contactEmail = query.contactEmail
+      if (query.brandWebsite) formData.value.brandWebsite = query.brandWebsite
+    }
+
     const loadCampaign = async () => {
       try {
         loading.value = true
@@ -864,7 +896,8 @@ export default {
         productPrice: '',
         layout: '',
         additionalProducts: [],
-        textContent: ''
+        textContent: '',
+        discountCode: ''
       }
     }
 
@@ -987,17 +1020,29 @@ export default {
         let brandLogoUrl = null
         if (formData.value.brandLogo) {
           try {
-            const fileName = `${Date.now()}-${formData.value.brandLogo.name}`
+            // Sanitize filename - remove spaces and special characters
+            const sanitizedFileName = formData.value.brandLogo.name
+              .toLowerCase()
+              .replace(/[^a-z0-9.]/g, '-')
+            
+            const timestamp = Date.now()
+            const fileName = `${timestamp}-${sanitizedFileName}`
+            const filePath = `${campaign.value.id}/logos/${fileName}`
+
+            // Upload using the correct path structure
             const { data: logoData, error: logoError } = await supabase.storage
               .from('brand-logos')
-              .upload(`${campaign.value.id}/logos/${fileName}`, formData.value.brandLogo)
+              .upload(filePath, formData.value.brandLogo, {
+                cacheControl: '3600',
+                upsert: false
+              })
 
             if (logoError) throw logoError
 
-            // Get the public URL for the uploaded logo
+            // Get the public URL using the correct path
             const { data: { publicUrl } } = supabase.storage
               .from('brand-logos')
-              .getPublicUrl(`${campaign.value.id}/logos/${fileName}`)
+              .getPublicUrl(filePath)
 
             brandLogoUrl = publicUrl
           } catch (uploadError) {
@@ -1012,7 +1057,6 @@ export default {
           brand_name: formData.value.brandName,
           contact_name: formData.value.contactName,
           contact_email: formData.value.contactEmail,
-          mailing_address: formData.value.mailingAddress,
           brand_url: formData.value.brandWebsite,
           brand_logo_url: brandLogoUrl,
           selected_pages: selectedPages.value.map(pageId => ({
@@ -1021,6 +1065,7 @@ export default {
             product_name: productForms.value[pageId].productName,
             product_description: productForms.value[pageId].productDescription,
             product_price: parseFloat(productForms.value[pageId].productPrice),
+            discount_code: productForms.value[pageId].discountCode,
             image_url: null // Will be updated after image upload
           })),
           total_price: calculateTotalPrice(),
@@ -1187,7 +1232,9 @@ export default {
       }
       
       if (isPageSelected(page.id)) {
-        removePlacement(page.id)
+        if (confirm('Are you sure you want to deselect this page? You will lose this page\'s assets and copy.')) {
+          removePlacement(page.id)
+        }
       } else {
         selectPage(page)
       }
@@ -1274,22 +1321,17 @@ export default {
       }
     }
 
-    onMounted(async () => {
-      try {
-        // Check storage availability
-        const { available, error: storageError } = await checkStorage()
-        if (!available) {
-          console.error('Storage not available:', storageError)
-          error.value = `Storage configuration error: ${storageError}`
-          return
-        }
-        
-        // Load campaign data
-        await loadCampaign()
-      } catch (err) {
-        console.error('Setup error:', err)
-        error.value = `Error setting up the form: ${err.message}`
-      }
+    const showPreview = () => {
+      showPreviewModal.value = true
+    }
+
+    const closePreview = () => {
+      showPreviewModal.value = false
+    }
+
+    onMounted(() => {
+      loadPrefilledData()
+      loadCampaign()
     })
 
     return {
@@ -1297,14 +1339,15 @@ export default {
       loading,
       error,
       submitted,
+      showPreviewModal,
+      showPlacementModal,
+      selectedPages,
+      pageRows,
+      productForms,
       formData,
       magazineData,
       layoutOptions,
-      selectedPages,
-      productForms,
-      showPlacementModal,
       reservedPages,
-      pageRows,
       totalPrice,
       submitAssets,
       handleLogoUpload,
@@ -1332,7 +1375,9 @@ export default {
       handleLayoutChange,
       addAdditionalProduct,
       removeAdditionalProduct,
-      handleAdditionalProductImageUpload
+      handleAdditionalProductImageUpload,
+      showPreview,
+      closePreview
     }
   }
 }
@@ -1403,6 +1448,7 @@ header p {
 /* Form Styles */
 .form-group {
   margin-bottom: 25px;
+  width: 100%;
 }
 
 label {
@@ -1803,23 +1849,73 @@ input:focus, textarea:focus, select:focus {
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 1000;
   overflow-y: auto;
+  padding: 20px;
 }
 
 .modal-content {
   position: relative;
   background-color: #fff;
-  margin: 50px auto;
+  margin: 20px auto;
   padding: 30px;
   width: 90%;
   max-width: 800px;
   border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  max-height: 90vh;
+  max-height: 85vh;
   overflow-y: auto;
 }
 
-/* Add all remaining modal styles from index.html */
-/* ... */
+#placement-modal .modal-content {
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#placement-details {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+#selected-pages-list {
+  margin-bottom: 20px;
+}
+
+.close-modal {
+  position: sticky;
+  top: 0;
+  right: 0;
+  padding: 10px;
+  cursor: pointer;
+  background: white;
+  z-index: 1001;
+  float: right;
+}
+
+/* Ensure form groups don't overflow */
+.form-group {
+  margin-bottom: 25px;
+  width: 100%;
+}
+
+/* Add some spacing between sections */
+.product-form {
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+/* Make sure buttons stay at the bottom */
+.btn-group {
+  margin-top: 20px;
+  position: sticky;
+  bottom: 0;
+  background: white;
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+}
 
 /* Add remaining styles */
 .page.selected {
@@ -2001,60 +2097,6 @@ input:focus, textarea:focus, select:focus {
   color: #4CAF50;
 }
 
-/* Modal Styles */
-.close-modal {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.selected-page-item {
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-}
-
-.product-form {
-  margin-top: 2rem;
-  padding: 1.5rem;
-  background: #fff;
-  border: 1px solid #eee;
-  border-radius: 8px;
-}
-
-.page-title {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #eee;
-}
-
-.price-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.currency-symbol {
-  position: absolute;
-  left: 0.75rem;
-  color: #666;
-}
-
-.price-input-wrapper input {
-  padding-left: 1.5rem;
-}
-
-.char-counter {
-  font-size: 0.75rem;
-  color: #666;
-  text-align: right;
-  margin-top: 0.25rem;
-}
-
 /* Responsive Styles */
 @media (max-width: 1200px) {
   .magazine-pages {
@@ -2184,5 +2226,70 @@ input:focus, textarea:focus, select:focus {
   font-size: 0.8em;
   margin-top: 8px;
   font-weight: 500;
+}
+
+.preview-section {
+  margin: 20px 0;
+  text-align: center;
+  padding: 20px;
+  background: var(--bg-color);
+  border-radius: 8px;
+}
+
+.preview-button {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin: 20px 0;
+
+  &:hover {
+    background-color: var(--primary-hover);
+  }
+}
+
+.preview-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  position: relative;
+  width: 90%;
+  height: 90%;
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  z-index: 1001;
+  padding: 0;
+  line-height: 1;
+
+  &:hover {
+    color: #000;
+  }
 }
 </style> 
