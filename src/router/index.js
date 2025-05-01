@@ -14,8 +14,10 @@ import InviteCodeAdmin from '../components/InviteCodeAdmin.vue'
 const routes = [
   {
     path: '/',
-    name: 'invite-code',
-    component: InviteCodeVerification
+    name: 'home',
+    component: () => {
+      return isAuthorizedUser() ? CampaignLanding : InviteCodeVerification
+    }
   },
   {
     path: '/landing',

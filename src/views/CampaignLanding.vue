@@ -66,10 +66,6 @@
               <span class="label">Asset Due Date:</span>
               <span class="value">{{ formatDate(campaign.asset_due_date) }}</span>
             </div>
-            <div class="detail-item">
-              <span class="label">Available Pages:</span>
-              <span class="value">{{ getAvailablePages(campaign) }} of {{ campaign.page_count }}</span>
-            </div>
           </div>
 
           <div class="button-group">
