@@ -16,7 +16,7 @@ const routes = [
     path: '/',
     name: 'home',
     component: () => {
-      return isAuthorizedUser() ? CampaignLanding : InviteCodeVerification
+      return Promise.resolve(isAuthorizedUser() ? CampaignLanding : InviteCodeVerification)
     }
   },
   {
