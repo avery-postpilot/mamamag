@@ -80,8 +80,23 @@ router.beforeEach((to, from, next) => {
 
   // Check for invite code
   if (to.meta.requiresInviteCode) {
-    const brandInfo = localStorage.getItem('brandInfo')
-    if (!brandInfo) {
+    const encryptedInfo = sessionStorage.getItem('brandInfo')
+    if (!encryptedInfo) {
+      next('/')
+      return
+    }
+
+    try {
+      const brandInfo = JSON.parse(atob(encryptedInfo))
+      // Check if session is expired (24 hours)
+      if (Date.now() - brandInfo.timestamp > 24 * 60 * 60 * 1000) {
+        sessionStorage.removeItem('brandInfo')
+        next('/')
+        return
+      }
+    } catch (err) {
+      console.error('Error parsing brand info:', err)
+      sessionStorage.removeItem('brandInfo')
       next('/')
       return
     }

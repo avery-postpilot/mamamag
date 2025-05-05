@@ -40,3 +40,9 @@ build/
 
 # Local Netlify folder
 .netlify
+
+# Environment files
+.env.local
+.env.*.local
+.env.development
+.env.production

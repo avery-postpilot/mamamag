@@ -94,11 +94,16 @@ const verifyCode = async () => {
         .update({ last_accessed: new Date().toISOString() })
         .eq('id', data.id)
 
-      // Store brand info in localStorage
-      localStorage.setItem('brandInfo', JSON.stringify({
+      // Store brand info in sessionStorage with encryption
+      const brandInfo = {
         brandName: data.brand_name,
-        inviteCode: data.invite_code
-      }))
+        inviteCode: data.invite_code,
+        timestamp: Date.now()
+      }
+      
+      // Simple encryption (in production, use a more robust encryption method)
+      const encryptedInfo = btoa(JSON.stringify(brandInfo))
+      sessionStorage.setItem('brandInfo', encryptedInfo)
 
       // Redirect to landing page
       router.push('/landing')
