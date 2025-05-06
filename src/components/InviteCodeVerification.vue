@@ -88,10 +88,13 @@ const verifyCode = async () => {
     if (verifyError) throw verifyError
 
     if (data) {
-      // Update last accessed timestamp
+      // Update last accessed timestamp and increment usage count
       await supabase
         .from('invite_codes')
-        .update({ last_accessed: new Date().toISOString() })
+        .update({ 
+          last_accessed: new Date().toISOString(),
+          usage_count: (data.usage_count || 0) + 1
+        })
         .eq('id', data.id)
 
       // Store brand info in sessionStorage with encryption
