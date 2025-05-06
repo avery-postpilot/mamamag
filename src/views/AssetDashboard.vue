@@ -115,6 +115,44 @@
               </div>
             </div>
 
+            <!-- Designer Notes Section -->
+            <div v-if="isAuthorizedUser()" class="designer-notes-section">
+              <div class="notes-header">
+                <h4>Designer Notes</h4>
+                <button 
+                  class="btn secondary"
+                  @click="toggleNotesEdit(submission)"
+                >
+                  {{ isEditingNotes(submission.id) ? 'Cancel' : 'Edit Notes' }}
+                </button>
+              </div>
+              
+              <div v-if="isEditingNotes(submission.id)" class="notes-edit">
+                <textarea
+                  v-model="editNotes[submission.id]"
+                  placeholder="Add notes for the designer..."
+                  rows="4"
+                ></textarea>
+                <div class="notes-actions">
+                  <button 
+                    class="btn primary"
+                    @click="saveDesignerNotes(submission)"
+                  >
+                    Save Notes
+                  </button>
+                </div>
+              </div>
+              
+              <div v-else class="notes-display">
+                <p v-if="submission.designer_notes" class="notes-content">
+                  {{ submission.designer_notes }}
+                </p>
+                <p v-else class="no-notes">
+                  No designer notes yet.
+                </p>
+              </div>
+            </div>
+
             <div class="pages-list">
               <div 
                 v-for="(page, pageIdx) in submission.selected_pages" 
@@ -316,6 +354,8 @@ export default {
     const editForm = ref({})
     const editImageFiles = ref({})
     const editAdditionalProductImageFiles = ref({})
+    const editNotes = ref({})
+    const editingNotesId = ref(null)
 
     // Load data from Supabase
     const loadData = async () => {
@@ -922,6 +962,40 @@ Status: ${submission.status}
       }
     }
 
+    const isEditingNotes = (submissionId) => {
+      return editingNotesId.value === submissionId
+    }
+
+    const toggleNotesEdit = (submission) => {
+      if (isEditingNotes(submission.id)) {
+        editingNotesId.value = null
+        editNotes.value[submission.id] = submission.designer_notes || ''
+      } else {
+        editingNotesId.value = submission.id
+        editNotes.value[submission.id] = submission.designer_notes || ''
+      }
+    }
+
+    const saveDesignerNotes = async (submission) => {
+      try {
+        const { error } = await supabase
+          .from('campaign_submissions')
+          .update({
+            designer_notes: editNotes.value[submission.id]
+          })
+          .eq('id', submission.id)
+
+        if (error) throw error
+
+        // Update local state
+        submission.designer_notes = editNotes.value[submission.id]
+        editingNotesId.value = null
+        alert('Designer notes saved!')
+      } catch (err) {
+        alert('Failed to save designer notes: ' + err.message)
+      }
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -955,7 +1029,11 @@ Status: ${submission.status}
       handleEditImageChange,
       handleEditAdditionalProductImageChange,
       editAdditionalProductImageFiles,
-      saveEditSubmission
+      saveEditSubmission,
+      editNotes,
+      isEditingNotes,
+      toggleNotesEdit,
+      saveDesignerNotes
     }
   }
 }
@@ -1585,5 +1663,58 @@ hr {
   border: none;
   border-top: 1px solid #ddd;
   margin: 1rem 0;
+}
+
+.designer-notes-section {
+  padding: 15px;
+  background: #f8f9fa;
+  border-top: 1px solid #ddd;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.notes-header h4 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.notes-edit textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+
+.notes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.notes-display {
+  padding: 10px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.notes-content {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #2c3e50;
+}
+
+.no-notes {
+  margin: 0;
+  color: #666;
+  font-style: italic;
 }
 </style> 
