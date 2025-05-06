@@ -117,7 +117,7 @@
 
             <div class="pages-list">
               <div 
-                v-for="page in submission.selected_pages" 
+                v-for="(page, pageIdx) in submission.selected_pages" 
                 :key="page.page_id"
                 class="page-item"
               >
@@ -200,6 +200,13 @@
                     >
                       Download Assets
                     </button>
+                    <button 
+                      v-if="isAuthorizedUser()"
+                      class="btn primary"
+                      @click="openEditModal(submission)"
+                    >
+                      Edit Submission
+                    </button>
                   </div>
                 </div>
               </div>
@@ -216,6 +223,72 @@
         <img :src="previewImage" :alt="previewImageAlt" class="preview-image">
       </div>
     </div>
+
+    <!-- Edit Submission Modal -->
+    <div v-if="showEditModal" class="modal" @click.self="closeEditModal">
+      <div class="modal-content">
+        <h2>Edit Submission</h2>
+        <form @submit.prevent="saveEditSubmission">
+          <div v-for="(page, pageIdx) in editForm.selected_pages" :key="page.page_id" class="edit-page-form">
+            <h3>Page {{ page.page_id }}</h3>
+            <div class="form-row">
+              <label>Product Name</label>
+              <input v-model="page.product_name" type="text" required />
+            </div>
+            <div class="form-row">
+              <label>Product Price</label>
+              <input v-model.number="page.product_price" type="number" min="0" step="0.01" required />
+            </div>
+            <div class="form-row">
+              <label>Product Description</label>
+              <textarea v-model="page.product_description" required></textarea>
+            </div>
+            <div class="form-row">
+              <label>Discount Code</label>
+              <input v-model="page.discount_code" type="text" />
+            </div>
+            <div class="form-row">
+              <label>Product Image</label>
+              <input type="file" @change="e => handleEditImageChange(e, pageIdx)" accept=".png,.jpg,.jpeg" />
+              <div v-if="page.image_url">
+                <img :src="page.image_url" alt="Current Image" style="max-width:100px;max-height:100px; margin-top: 8px;" />
+              </div>
+            </div>
+
+            <!-- Additional Products Editing for multi-product layout -->
+            <div v-if="page.layout === 'multi-product' && page.additional_products?.length" class="additional-products-edit">
+              <h4>Additional Products</h4>
+              <div v-for="(product, prodIdx) in page.additional_products" :key="prodIdx" class="additional-product-edit">
+                <div class="form-row">
+                  <label>Product Name</label>
+                  <input v-model="product.name" type="text" required />
+                </div>
+                <div class="form-row">
+                  <label>Product Price</label>
+                  <input v-model.number="product.price" type="number" min="0" step="0.01" required />
+                </div>
+                <div class="form-row">
+                  <label>Product Description</label>
+                  <textarea v-model="product.description" required></textarea>
+                </div>
+                <div class="form-row">
+                  <label>Product Image</label>
+                  <input type="file" @change="e => handleEditAdditionalProductImageChange(e, pageIdx, prodIdx)" accept=".png,.jpg,.jpeg" />
+                  <div v-if="product.image_url">
+                    <img :src="product.image_url" alt="Current Image" style="max-width:100px;max-height:100px; margin-top: 8px;" />
+                  </div>
+                </div>
+                <hr v-if="prodIdx < page.additional_products.length - 1" />
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn secondary" @click="closeEditModal">Cancel</button>
+            <button type="submit" class="btn primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -224,6 +297,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabaseClient'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
+import { isAuthorizedUser } from '@/stores/auth'
 
 export default {
   name: 'AssetDashboard',
@@ -237,6 +311,11 @@ export default {
     const expandedCampaigns = ref(new Set())
     const previewImage = ref(null)
     const previewImageAlt = ref('')
+    const showEditModal = ref(false)
+    const editSubmission = ref(null)
+    const editForm = ref({})
+    const editImageFiles = ref({})
+    const editAdditionalProductImageFiles = ref({})
 
     // Load data from Supabase
     const loadData = async () => {
@@ -729,6 +808,120 @@ Status: ${submission.status}
       }
     }
 
+    // Open edit modal and prefill form
+    const openEditModal = (submission) => {
+      editSubmission.value = submission
+      // Deep copy to avoid mutating original until save
+      editForm.value = JSON.parse(JSON.stringify(submission))
+      editImageFiles.value = {}
+      editAdditionalProductImageFiles.value = {}
+      showEditModal.value = true
+    }
+    const closeEditModal = () => {
+      showEditModal.value = false
+      editSubmission.value = null
+      editForm.value = {}
+      editImageFiles.value = {}
+      editAdditionalProductImageFiles.value = {}
+    }
+
+    // Handle image file change for main product
+    const handleEditImageChange = (event, pageIdx) => {
+      const file = event.target.files[0]
+      if (file) {
+        editImageFiles.value[pageIdx] = file
+      }
+    }
+
+    // Handle image file change for additional products
+    const handleEditAdditionalProductImageChange = (event, pageIdx, prodIdx) => {
+      const file = event.target.files[0]
+      if (!editAdditionalProductImageFiles.value[pageIdx]) {
+        editAdditionalProductImageFiles.value[pageIdx] = {}
+      }
+      if (file) {
+        editAdditionalProductImageFiles.value[pageIdx][prodIdx] = file
+      }
+    }
+
+    // Save edits to Supabase
+    const saveEditSubmission = async () => {
+      try {
+        // Upload new images for main products if any
+        for (let i = 0; i < editForm.value.selected_pages.length; i++) {
+          if (editImageFiles.value[i]) {
+            const file = editImageFiles.value[i]
+            const sanitizedFileName = file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-')
+            const timestamp = Date.now()
+            const fileName = `${timestamp}-${sanitizedFileName}`
+            const filePath = `${editForm.value.campaign_id}/products/${fileName}`
+            const { data: imageData, error: imageError } = await supabase.storage
+              .from('product-images')
+              .upload(filePath, file, { upsert: true })
+            if (imageError) throw imageError
+            const { data: { publicUrl } } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath)
+            editForm.value.selected_pages[i].image_url = publicUrl
+          }
+
+          // Upload new images for additional products if any
+          const page = editForm.value.selected_pages[i]
+          if (page.layout === 'multi-product' && page.additional_products?.length && editAdditionalProductImageFiles.value[i]) {
+            for (let j = 0; j < page.additional_products.length; j++) {
+              if (editAdditionalProductImageFiles.value[i][j]) {
+                const file = editAdditionalProductImageFiles.value[i][j]
+                const sanitizedFileName = file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-')
+                const timestamp = Date.now()
+                const fileName = `${timestamp}-additional-${j}-${sanitizedFileName}`
+                const filePath = `${editForm.value.campaign_id}/products/${fileName}`
+                const { data: imageData, error: imageError } = await supabase.storage
+                  .from('product-images')
+                  .upload(filePath, file, { upsert: true })
+                if (imageError) throw imageError
+                const { data: { publicUrl } } = supabase.storage
+                  .from('product-images')
+                  .getPublicUrl(filePath)
+                // Update the image object structure for additional products
+                page.additional_products[j].image = {
+                  url: publicUrl
+                }
+              }
+            }
+          }
+        }
+
+        // Extract additional products from the first page (since they're all in one array)
+        const additionalProducts = editForm.value.selected_pages[0]?.additional_products || []
+
+        // Update submission in Supabase with both selected_pages and additional_products
+        const { error } = await supabase
+          .from('campaign_submissions')
+          .update({
+            selected_pages: editForm.value.selected_pages.map(page => ({
+              ...page,
+              additional_products: undefined // Remove additional_products from selected_pages
+            })),
+            additional_products: additionalProducts
+          })
+          .eq('id', editForm.value.id)
+
+        if (error) throw error
+
+        // Update local state
+        Object.assign(editSubmission.value.selected_pages, editForm.value.selected_pages.map(page => ({
+          ...page,
+          additional_products: undefined
+        })))
+        editSubmission.value.additional_products = additionalProducts
+
+        closeEditModal()
+        alert('Submission updated!')
+      } catch (err) {
+        alert('Failed to update submission: ' + err.message)
+      }
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -753,7 +946,16 @@ Status: ${submission.status}
       formatNumber,
       isCampaignActive,
       toggleArchive,
-      downloadBrandLogo
+      downloadBrandLogo,
+      isAuthorizedUser,
+      showEditModal,
+      editForm,
+      openEditModal,
+      closeEditModal,
+      handleEditImageChange,
+      handleEditAdditionalProductImageChange,
+      editAdditionalProductImageFiles,
+      saveEditSubmission
     }
   }
 }
@@ -1323,5 +1525,65 @@ Status: ${submission.status}
   background-color: #E8F5E9;
   border-radius: 4px;
   display: inline-block;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  z-index: 10001;
+}
+
+.edit-page-form {
+  margin-bottom: 2rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+.additional-products-edit {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.additional-product-edit {
+  margin-bottom: 1.5rem;
+}
+
+.additional-product-edit:last-child {
+  margin-bottom: 0;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 1rem 0;
 }
 </style> 
