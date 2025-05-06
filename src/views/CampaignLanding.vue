@@ -15,6 +15,7 @@
           <p>Reserve your spot in our upcoming issues</p>
           <div v-if="brandName" class="welcome-message">
             Welcome, {{ brandName }}
+            <button @click="switchBrand" class="switch-brand-btn">Switch Brand</button>
           </div>
           <button @click="showPreview" class="preview-button">Preview MamaMag</button>
         </div>
@@ -129,11 +130,16 @@ export default {
     }
 
     const loadBrandInfo = () => {
-      const brandInfo = localStorage.getItem('brandInfo')
-      if (brandInfo) {
-        const { brandName: name, inviteCode } = JSON.parse(brandInfo)
-        brandName.value = name
-        fetchExistingBrandInfo(name)
+      const encryptedInfo = sessionStorage.getItem('brandInfo')
+      if (encryptedInfo) {
+        try {
+          const brandInfo = JSON.parse(atob(encryptedInfo))
+          brandName.value = brandInfo.brandName
+          fetchExistingBrandInfo(brandInfo.brandName)
+        } catch (err) {
+          console.error('Error parsing brand info:', err)
+          sessionStorage.removeItem('brandInfo')
+        }
       }
     }
 
@@ -259,6 +265,11 @@ export default {
       showPreviewModal.value = false
     }
 
+    const switchBrand = () => {
+      sessionStorage.removeItem('brandInfo')
+      router.push('/')
+    }
+
     onMounted(() => {
       loadBrandInfo()
       loadCampaigns()
@@ -277,7 +288,8 @@ export default {
       showPreview,
       closePreview,
       showPreviewModal,
-      brandName
+      brandName,
+      switchBrand
     }
   }
 }
@@ -635,5 +647,25 @@ footer {
   font-size: 1.2rem;
   color: #4a5568;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+
+  .switch-brand-btn {
+    background: none;
+    border: 1px solid #ff69b4;
+    color: #ff69b4;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #ff69b4;
+      color: white;
+    }
+  }
 }
 </style> 
