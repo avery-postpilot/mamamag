@@ -58,6 +58,12 @@ const routes = [
     component: BrandLookup
   },
   {
+    path: '/sales-outreach',
+    name: 'sales-outreach',
+    component: () => import('../views/SalesOutreach.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/admin/invite-codes',
     name: 'invite-code-admin',
     component: InviteCodeAdmin,
