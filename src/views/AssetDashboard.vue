@@ -390,7 +390,8 @@ export default {
             selected_pages,
             brand_logo_url,
             added_to_design,
-            additional_products
+            additional_products,
+            designer_notes
           `)
           .order('created_at', { ascending: false })
 
@@ -887,78 +888,95 @@ Status: ${submission.status}
     // Save edits to Supabase
     const saveEditSubmission = async () => {
       try {
-        // Upload new images for main products if any
-        for (let i = 0; i < editForm.value.selected_pages.length; i++) {
-          if (editImageFiles.value[i]) {
-            const file = editImageFiles.value[i]
-            const sanitizedFileName = file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-')
-            const timestamp = Date.now()
-            const fileName = `${timestamp}-${sanitizedFileName}`
-            const filePath = `${editForm.value.campaign_id}/products/${fileName}`
-            const { data: imageData, error: imageError } = await supabase.storage
-              .from('product-images')
-              .upload(filePath, file, { upsert: true })
-            if (imageError) throw imageError
-            const { data: { publicUrl } } = supabase.storage
-              .from('product-images')
-              .getPublicUrl(filePath)
-            editForm.value.selected_pages[i].image_url = publicUrl
-          }
+        loading.value = true
+        error.value = null
 
-          // Upload new images for additional products if any
-          const page = editForm.value.selected_pages[i]
-          if (page.layout === 'multi-product' && page.additional_products?.length && editAdditionalProductImageFiles.value[i]) {
-            for (let j = 0; j < page.additional_products.length; j++) {
-              if (editAdditionalProductImageFiles.value[i][j]) {
-                const file = editAdditionalProductImageFiles.value[i][j]
-                const sanitizedFileName = file.name.toLowerCase().replace(/[^a-z0-9.]/g, '-')
-                const timestamp = Date.now()
-                const fileName = `${timestamp}-additional-${j}-${sanitizedFileName}`
-                const filePath = `${editForm.value.campaign_id}/products/${fileName}`
-                const { data: imageData, error: imageError } = await supabase.storage
-                  .from('product-images')
-                  .upload(filePath, file, { upsert: true })
-                if (imageError) throw imageError
-                const { data: { publicUrl } } = supabase.storage
-                  .from('product-images')
-                  .getPublicUrl(filePath)
-                // Update the image object structure for additional products
-                page.additional_products[j].image = {
-                  url: publicUrl
-                }
-              }
+        // Upload new images if any exist
+        const imageUrls = {}
+        for (const pageId in editSubmission.value.selected_pages) {
+          const page = editSubmission.value.selected_pages[pageId]
+          if (page.newImage) {
+            try {
+              // Sanitize filename
+              const sanitizedFileName = page.newImage.name
+                .toLowerCase()
+                .replace(/[^a-z0-9.]/g, '-')
+                .replace(/\.+/g, '.')
+              
+              const timestamp = Date.now()
+              const fileName = `${timestamp}-${sanitizedFileName}`
+              const filePath = `${campaign.value.id}/products/${fileName}`
+
+              const { data: imageData, error: imageError } = await supabase.storage
+                .from('product-images')
+                .upload(filePath, page.newImage)
+
+              if (imageError) throw imageError
+
+              // Get the public URL
+              const { data: { publicUrl } } = supabase.storage
+                .from('product-images')
+                .getPublicUrl(filePath)
+
+              imageUrls[pageId] = publicUrl
+            } catch (uploadError) {
+              console.error('Error uploading image:', uploadError)
+              throw new Error('Failed to upload image: ' + uploadError.message)
             }
           }
         }
 
-        // Extract additional products from the first page (since they're all in one array)
-        const additionalProducts = editForm.value.selected_pages[0]?.additional_products || []
+        // Update image URLs in the submission data
+        for (const pageId in editSubmission.value.selected_pages) {
+          if (imageUrls[pageId]) {
+            editSubmission.value.selected_pages[pageId].image_url = imageUrls[pageId]
+          }
+        }
 
-        // Update submission in Supabase with both selected_pages and additional_products
-        const { error } = await supabase
+        // Extract additional products from the first page's additional_products array
+        const additionalProducts = editSubmission.value.selected_pages[0]?.additional_products || []
+
+        // Update the submission in Supabase
+        const { data, error: updateError } = await supabase
           .from('campaign_submissions')
           .update({
-            selected_pages: editForm.value.selected_pages.map(page => ({
+            selected_pages: editSubmission.value.selected_pages.map(page => ({
               ...page,
-              additional_products: undefined // Remove additional_products from selected_pages
+              additional_products: undefined // Remove from selected_pages
             })),
-            additional_products: additionalProducts
+            additional_products: additionalProducts,
+            designer_notes: editSubmission.value.designer_notes // Add designer notes to the update
           })
-          .eq('id', editForm.value.id)
+          .eq('id', editSubmission.value.id)
+          .select()
 
-        if (error) throw error
+        if (updateError) {
+          console.error('Update error:', updateError)
+          throw updateError
+        }
 
         // Update local state
-        Object.assign(editSubmission.value.selected_pages, editForm.value.selected_pages.map(page => ({
-          ...page,
-          additional_products: undefined
-        })))
-        editSubmission.value.additional_products = additionalProducts
+        const index = submissions.value.findIndex(s => s.id === editSubmission.value.id)
+        if (index !== -1) {
+          submissions.value[index] = {
+            ...submissions.value[index],
+            selected_pages: editSubmission.value.selected_pages.map(page => ({
+              ...page,
+              additional_products: undefined
+            })),
+            additional_products: additionalProducts,
+            designer_notes: editSubmission.value.designer_notes // Update local state with designer notes
+          }
+        }
 
-        closeEditModal()
-        alert('Submission updated!')
+        // Close modal and show success message
+        showEditModal.value = false
+        alert('Changes saved successfully!')
       } catch (err) {
-        alert('Failed to update submission: ' + err.message)
+        console.error('Error saving changes:', err)
+        error.value = err.message
+      } finally {
+        loading.value = false
       }
     }
 

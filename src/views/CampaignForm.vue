@@ -707,6 +707,21 @@ export default {
     })
 
     const loadPrefilledData = () => {
+      // First check localStorage for saved brand info
+      const savedBrandInfo = localStorage.getItem('brandInfo')
+      if (savedBrandInfo) {
+        const brandInfo = JSON.parse(savedBrandInfo)
+        formData.value.brandName = brandInfo.brandName || ''
+        formData.value.contactName = brandInfo.contactName || ''
+        formData.value.contactEmail = brandInfo.contactEmail || ''
+        formData.value.brandWebsite = brandInfo.brandWebsite || ''
+        // Note: We can't restore the logo file, but we can show a message
+        if (brandInfo.brandLogoUrl) {
+          alert('Your previously uploaded logo is available. Please upload it again if needed.')
+        }
+      }
+
+      // Then check URL query parameters (these will override localStorage values)
       const query = route.query
       if (query.brandName) formData.value.brandName = query.brandName
       if (query.contactName) formData.value.contactName = query.contactName
@@ -1091,6 +1106,15 @@ export default {
             throw new Error('Failed to upload brand logo: ' + uploadError.message)
           }
         }
+
+        // Save brand info to localStorage for future forms
+        localStorage.setItem('brandInfo', JSON.stringify({
+          brandName: formData.value.brandName,
+          contactName: formData.value.contactName,
+          contactEmail: formData.value.contactEmail,
+          brandWebsite: formData.value.brandWebsite,
+          brandLogoUrl: brandLogoUrl
+        }))
 
         // Process additional products for multi-product layouts
         for (const pageId of selectedPages.value) {
