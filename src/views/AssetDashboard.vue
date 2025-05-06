@@ -196,7 +196,7 @@
                   <div class="page-actions">
                     <button 
                       class="btn secondary" 
-                      @click="downloadSingleAsset(page, submission)"
+                      @click="downloadSingleAsset(submission)"
                     >
                       Download Assets
                     </button>
@@ -270,7 +270,8 @@ export default {
             updated_at,
             selected_pages,
             brand_logo_url,
-            added_to_design
+            added_to_design,
+            additional_products
           `)
           .order('created_at', { ascending: false })
 
@@ -284,10 +285,18 @@ export default {
           console.log('Processing submission:', submission.id)
           const processedPages = Array.isArray(submission.selected_pages) 
             ? submission.selected_pages.map(page => {
-                console.log('Page image_url:', page.image_url)
+                console.log('Processing page:', page)
+                // Get additional products from the JSONB column
+                const additionalProducts = submission.additional_products || []
                 return {
                   ...page,
-                  image_url: page.image_url || null
+                  image_url: page.image_url || null,
+                  additional_products: additionalProducts.map(product => ({
+                    name: product.name || 'Untitled Product',
+                    description: product.description || 'No description available',
+                    price: product.price || 0,
+                    image_url: product.image?.url || null
+                  }))
                 }
               })
             : []
@@ -367,11 +376,8 @@ export default {
         return url
       }
 
-      // Clean up the filename to remove any duplicate paths
-      const cleanFilename = filename.replace(/^.*?products\//, '')
-      
-      // Construct the full Supabase URL for product images
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${campaignId}/products/${cleanFilename}`
+      // For product images, use the full path as provided in the JSONB
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${filename}`
       console.log('Generated product image URL:', url)
       return url
     }
@@ -462,57 +468,91 @@ export default {
       }
     }
 
-    const downloadSingleAsset = async (page, submission) => {
+    const downloadSingleAsset = async (submission) => {
       try {
         const zip = new JSZip()
-        const campaign = campaigns.value.find(c => c.id === submission.campaign_id)
-        const folderName = `${sanitizeFileName(campaign.name)}_${sanitizeFileName(page.page_id)}_${sanitizeFileName(submission.brand_name)}_${sanitizeFileName(page.product_name)}`
         
-        // Add copy file with product details
-        const copyContent = generatePageCopyContent(page, submission)
-        zip.file(`${folderName}/copy.txt`, copyContent)
+        // Add copy file
+        const copyContent = `Brand: ${submission.brand_name}
+Contact: ${submission.contact_name}
+Email: ${submission.contact_email}
+Website: ${submission.brand_website || 'N/A'}
 
-        // Download and add main product image
-        if (page.image_url) {
+Selected Pages:
+${submission.selected_pages.map(page => `
+Page: ${page.page_id}
+Layout: ${page.layout}
+Product: ${page.product_name}
+Price: $${page.product_price}
+Description: ${page.product_description}
+${page.discount_code ? `Discount Code: ${page.discount_code}` : ''}
+`).join('\n')}
+
+Additional Products:
+${submission.additional_products ? submission.additional_products.map(product => `
+Product: ${product.name}
+Price: $${product.price}
+Description: ${product.description}
+`).join('\n') : 'None'}
+
+Text Content:
+${submission.text_content || 'None'}`
+        
+        zip.file('copy.txt', copyContent)
+
+        // Add brand logo if available
+        if (submission.brand_logo_url) {
           try {
-            const imageUrl = getImageUrl(page.image_url, submission.campaign_id)
-            const response = await fetch(imageUrl)
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`)
-            }
-            const blob = await response.blob()
-            const fileName = `${sanitizeFileName(page.product_name)}.${page.image_url.split('.').pop()}`
-            zip.file(`${folderName}/${fileName}`, blob)
-          } catch (imgError) {
-            console.error('Error downloading product image:', imgError)
+            const logoResponse = await fetch(submission.brand_logo_url)
+            const logoBlob = await logoResponse.blob()
+            const logoFileName = submission.brand_logo_url.split('/').pop()
+            zip.file(`brand-logo/${logoFileName}`, logoBlob)
+          } catch (err) {
+            console.error('Error downloading brand logo:', err)
           }
         }
 
-        // Download and add additional product images
-        if (page.layout === 'multi-product' && page.additional_products?.length) {
-          for (const [index, product] of page.additional_products.entries()) {
-            if (product.image_url) {
+        // Add main product images
+        for (const page of submission.selected_pages) {
+          if (page.image_url) {
+            try {
+              const response = await fetch(page.image_url)
+              const blob = await response.blob()
+              const fileName = page.image_url.split('/').pop()
+              zip.file(`products/${fileName}`, blob)
+            } catch (err) {
+              console.error(`Error downloading image for ${page.page_id}:`, err)
+            }
+          }
+        }
+
+        // Add additional product images
+        if (submission.additional_products) {
+          for (const product of submission.additional_products) {
+            if (product.image?.url) {
               try {
-                const imageUrl = getImageUrl(product.image_url, submission.campaign_id)
-                const response = await fetch(imageUrl)
-                if (!response.ok) {
-                  throw new Error(`HTTP error! status: ${response.status}`)
-                }
+                const response = await fetch(product.image.url)
                 const blob = await response.blob()
-                const fileName = `additional_product_${index + 1}.${product.image_url.split('.').pop()}`
-                zip.file(`${folderName}/${fileName}`, blob)
-              } catch (imgError) {
-                console.error(`Error downloading additional product image ${index + 1}:`, imgError)
+                const fileName = product.image.url.split('/').pop()
+                zip.file(`additional-products/${fileName}`, blob)
+              } catch (err) {
+                console.error(`Error downloading additional product image for ${product.name}:`, err)
               }
             }
           }
         }
 
+        // Generate and download zip file
         const content = await zip.generateAsync({ type: 'blob' })
-        saveAs(content, `${folderName}.zip`)
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(content)
+        link.download = `${submission.brand_name}-assets.zip`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
       } catch (err) {
-        console.error('Error downloading single asset:', err)
-        alert('Failed to download asset. Please try again.')
+        console.error('Error creating zip file:', err)
+        alert('Failed to download assets. Please try again.')
       }
     }
 
@@ -598,9 +638,9 @@ ${page.discount_code ? `Discount Code: ${page.discount_code}` : ''}
 `
 
       // Add additional products if present
-      if (page.layout === 'multi-product' && page.additional_products?.length) {
+      if (page.layout === 'multi-product' && submission.additional_products?.length) {
         content += '\nAdditional Products:\n'
-        page.additional_products.forEach((product, index) => {
+        submission.additional_products.forEach((product, index) => {
           content += `\nProduct ${index + 1}:
 Name: ${product.name || 'N/A'}
 Description: ${product.description || 'N/A'}

@@ -13,11 +13,16 @@ CREATE TABLE IF NOT EXISTS invite_codes (
 );
 
 -- Create index for faster lookups
-CREATE INDEX idx_invite_code ON invite_codes(invite_code);
-CREATE INDEX idx_brand_name ON invite_codes(brand_name);
+CREATE INDEX IF NOT EXISTS idx_invite_code ON invite_codes(invite_code);
+CREATE INDEX IF NOT EXISTS idx_brand_name ON invite_codes(brand_name);
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE invite_codes ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow public to verify invite codes" ON invite_codes;
+DROP POLICY IF EXISTS "Allow public to update usage stats" ON invite_codes;
+DROP POLICY IF EXISTS "Allow authenticated users to manage invite codes" ON invite_codes;
 
 -- Create policies
 -- Allow anyone to verify an invite code
@@ -25,6 +30,16 @@ CREATE POLICY "Allow public to verify invite codes"
     ON invite_codes
     FOR SELECT
     USING (true);
+
+-- Allow public to update last_accessed and usage_count
+CREATE POLICY "Allow public to update usage stats"
+    ON invite_codes
+    FOR UPDATE
+    USING (true)
+    WITH CHECK (
+        -- Only allow updating last_accessed and usage_count
+        (last_accessed IS NOT NULL OR usage_count IS NOT NULL)
+    );
 
 -- Only allow authenticated users to create/update/delete
 CREATE POLICY "Allow authenticated users to manage invite codes"

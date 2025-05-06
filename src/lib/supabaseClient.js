@@ -16,6 +16,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     headers: {
       'x-application-name': 'mamamag-campaign-portal'
     }
+  },
+  // Add headers for Edge Functions
+  headers: {
+    'x-application-name': 'mamamag-campaign-portal'
   }
 })
 

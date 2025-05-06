@@ -262,7 +262,14 @@
                         <label :class="{ required: index === 0 }">Product Price</label>
                         <div class="price-input-wrapper">
                           <span class="currency-symbol">$</span>
-                          <input type="number" v-model="product.price" min="0" step="0.01" :required="index === 0">
+                          <input 
+                            type="number" 
+                            v-model="product.price" 
+                            min="0" 
+                            step="0.01" 
+                            :required="index === 0"
+                            :name="'additional-product-price-' + pageId + '-' + index"
+                          >
                         </div>
                       </div>
                       <div class="form-group">
@@ -957,6 +964,39 @@ export default {
       showPlacementModal.value = false
     }
 
+    const uploadProductImage = async (file, pageId) => {
+      try {
+        // Sanitize the filename
+        const sanitizedFileName = file.name
+          .toLowerCase()
+          .replace(/[^a-z0-9.]/g, '-')
+          .replace(/\.+/g, '.')
+        
+        const timestamp = Date.now()
+        const fileName = `${timestamp}-${sanitizedFileName}`
+        const filePath = `${campaign.value.id}/products/${fileName}`
+        
+        const { data: imageData, error: imageError } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, file)
+
+        if (imageError) {
+          console.error('Product image upload error:', imageError)
+          throw new Error(`Product image upload failed: ${imageError.message}`)
+        }
+
+        // Get the public URL for the uploaded image
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(filePath)
+
+        return publicUrl
+      } catch (err) {
+        console.error('Product image upload error:', err)
+        throw new Error(`Product image upload failed: ${err.message}`)
+      }
+    }
+
     const submitAssets = async () => {
       try {
         loading.value = true
@@ -1020,10 +1060,11 @@ export default {
         let brandLogoUrl = null
         if (formData.value.brandLogo) {
           try {
-            // Sanitize filename - remove spaces and special characters
+            // Sanitize filename
             const sanitizedFileName = formData.value.brandLogo.name
               .toLowerCase()
               .replace(/[^a-z0-9.]/g, '-')
+              .replace(/\.+/g, '.')
             
             const timestamp = Date.now()
             const fileName = `${timestamp}-${sanitizedFileName}`
@@ -1039,7 +1080,7 @@ export default {
 
             if (logoError) throw logoError
 
-            // Get the public URL using the correct path
+            // Get the public URL
             const { data: { publicUrl } } = supabase.storage
               .from('brand-logos')
               .getPublicUrl(filePath)
@@ -1051,7 +1092,22 @@ export default {
           }
         }
 
-        // Then proceed with the campaign submission
+        // Process additional products for multi-product layouts
+        for (const pageId of selectedPages.value) {
+          const form = productForms.value[pageId]
+          if (form.layout === 'multi-product' && form.additionalProducts) {
+            // Ensure each additional product has its image URL stored
+            form.additionalProducts = form.additionalProducts.map(product => ({
+              name: product.name,
+              price: parseFloat(product.price),
+              description: product.description,
+              image: product.image ? {
+                url: product.image.url
+              } : null
+            }))
+          }
+        }
+
         const submissionData = {
           campaign_id: campaign.value.id,
           brand_name: formData.value.brandName,
@@ -1082,28 +1138,41 @@ export default {
           for (const pageId of selectedPages.value) {
             const form = productForms.value[pageId]
             if (form.productImages && form.productImages.length > 0) {
-              const imagePath = await uploadProductImage(form.productImages[0], pageId)
+              const imageUrl = await uploadProductImage(form.productImages[0], pageId)
               const pageIndex = submissionData.selected_pages.findIndex(p => p.page_id === pageId)
               if (pageIndex !== -1) {
-                submissionData.selected_pages[pageIndex].image_url = imagePath
+                submissionData.selected_pages[pageIndex].image_url = imageUrl
               }
             }
           }
-        } catch (uploadError) {
-          console.error('Error uploading images:', uploadError)
-          throw new Error('Failed to upload product images: ' + uploadError.message)
+
+          // Insert the submission into the database
+          const { data, error: dbError } = await supabase
+            .from('campaign_submissions')
+            .insert(submissionData)
+            .select()
+
+          if (dbError) throw dbError
+
+          // Show success message and reset form
+          alert('Reservation submitted successfully!')
+          selectedPages.value = []
+          formData.value = {
+            brandName: '',
+            contactName: '',
+            contactEmail: '',
+            brandWebsite: '',
+            brandLogo: null
+          }
+          productForms.value = {}
+          closeModal()
+
+        } catch (err) {
+          console.error('Error submitting reservation:', err)
+          throw new Error(`Failed to submit reservation: ${err.message}`)
         }
-
-        const { error: submissionError } = await supabase
-          .from('campaign_submissions')
-          .insert([submissionData])
-
-        if (submissionError) throw submissionError
-
-        submitted.value = true
       } catch (err) {
-        console.error('Error submitting assets:', err)
-        error.value = 'Failed to submit assets. Please try again.'
+        error.value = err.message
       } finally {
         loading.value = false
       }
@@ -1141,44 +1210,87 @@ export default {
         loading.value = true
         error.value = null
 
-        // Upload image to Supabase Storage
-        const { data: imageData, error: imageError } = await supabase.storage
-          .from('product-images')
-          .upload(`${Date.now()}-${formData.value.productImage.name}`, formData.value.productImage)
-
-        if (imageError) throw imageError
-
-        // Create reservation in database
-        const { data, error: dbError } = await supabase
-          .from('campaign_submissions')
-          .insert({
-            campaignId: route.params.id,
-            selectedPages: selectedPages.value.map(page => ({
-              pageId: page.id,
-              layout: page.selectedLayout || 'full',
-              price: page.basePrice + (page.additionalPremium || 0)
-            })),
-            productName: formData.value.productName,
-            productDescription: formData.value.productDescription,
-            productImageUrl: imageData.path,
-            totalPrice: calculateTotalPrice(),
-            status: 'pending'
-          })
-
-        if (dbError) throw dbError
-
-        // Show success message and reset form
-        alert('Reservation submitted successfully!')
-        selectedPages.value = []
-        formData.value = {
-          productName: '',
-          productDescription: '',
-          productImage: null
+        // Process additional products for multi-product layouts
+        for (const pageId of selectedPages.value) {
+          const form = productForms.value[pageId]
+          if (form.layout === 'multi-product' && form.additionalProducts) {
+            // Ensure each additional product has its image URL stored
+            form.additionalProducts = form.additionalProducts.map(product => ({
+              name: product.name,
+              price: parseFloat(product.price),
+              description: product.description,
+              image: product.image ? {
+                url: product.image.url
+              } : null
+            }))
+          }
         }
-        closeModal()
 
+        const submissionData = {
+          campaign_id: campaign.value.id,
+          brand_name: formData.value.brandName,
+          contact_name: formData.value.contactName,
+          contact_email: formData.value.contactEmail,
+          brand_url: formData.value.brandWebsite,
+          brand_logo_url: brandLogoUrl,
+          selected_pages: selectedPages.value.map(pageId => ({
+            page_id: pageId,
+            layout: productForms.value[pageId].layout,
+            product_name: productForms.value[pageId].productName,
+            product_description: productForms.value[pageId].productDescription,
+            product_price: parseFloat(productForms.value[pageId].productPrice),
+            discount_code: productForms.value[pageId].discountCode,
+            image_url: null // Will be updated after image upload
+          })),
+          total_price: calculateTotalPrice(),
+          status: 'pending',
+          layout_type: productForms.value[selectedPages.value[0]].layout,
+          page_id: selectedPages.value[0],
+          added_to_design: false,
+          additional_products: productForms.value[selectedPages.value[0]].additionalProducts || [],
+          text_content: productForms.value[selectedPages.value[0]].textContent || null
+        }
+
+        // Upload images first
+        try {
+          for (const pageId of selectedPages.value) {
+            const form = productForms.value[pageId]
+            if (form.productImages && form.productImages.length > 0) {
+              const imageUrl = await uploadProductImage(form.productImages[0], pageId)
+              const pageIndex = submissionData.selected_pages.findIndex(p => p.page_id === pageId)
+              if (pageIndex !== -1) {
+                submissionData.selected_pages[pageIndex].image_url = imageUrl
+              }
+            }
+          }
+
+          // Insert the submission into the database
+          const { data, error: dbError } = await supabase
+            .from('campaign_submissions')
+            .insert(submissionData)
+            .select()
+
+          if (dbError) throw dbError
+
+          // Show success message and reset form
+          alert('Reservation submitted successfully!')
+          selectedPages.value = []
+          formData.value = {
+            brandName: '',
+            contactName: '',
+            contactEmail: '',
+            brandWebsite: '',
+            brandLogo: null
+          }
+          productForms.value = {}
+          closeModal()
+
+        } catch (err) {
+          console.error('Error submitting reservation:', err)
+          throw new Error(`Failed to submit reservation: ${err.message}`)
+        }
       } catch (err) {
-        error.value = 'Failed to submit reservation: ' + err.message
+        error.value = err.message
       } finally {
         loading.value = false
       }
@@ -1288,36 +1400,50 @@ export default {
       if (!form.additionalProducts) {
         form.additionalProducts = []
       }
-      form.additionalProducts[index].image = files[0]
 
-      // Update the file list display
-      const fileList = event.target.parentElement.nextElementSibling
-      fileList.innerHTML = `<div class="file-item">${files[0].name}</div>`
-    }
-
-    const uploadProductImage = async (file, pageId) => {
       try {
-        const fileName = `${pageId}-${Date.now()}-${file.name}`
-        const ext = file.name.split('.').pop()
-        console.log('Attempting to upload product image to bucket:', 'product-images')
+        // Upload the image to Supabase storage
+        const file = files[0]
+        // Sanitize the filename - remove spaces and special characters
+        const sanitizedFileName = file.name
+          .toLowerCase()
+          .replace(/[^a-z0-9.]/g, '-')
+          .replace(/\.+/g, '.') // Replace multiple dots with single dot
+        
+        const timestamp = Date.now()
+        const fileName = `${timestamp}-${sanitizedFileName}`
+        const filePath = `${campaign.value.id}/products/${fileName}`
         
         const { data: imageData, error: imageError } = await supabase.storage
           .from('product-images')
-          .upload(`${campaign.value.id}/products/${fileName}.${ext}`, file)
+          .upload(filePath, file)
 
         if (imageError) {
-          console.error('Product image upload error:', imageError)
-          throw new Error(`Product image upload failed: ${imageError.message}`)
+          console.error('Additional product image upload error:', imageError)
+          throw new Error(`Additional product image upload failed: ${imageError.message}`)
         }
 
         if (!imageData?.path) {
-          throw new Error('Product image upload failed: No path returned from storage')
+          throw new Error('Additional product image upload failed: No path returned from storage')
         }
 
-        return imageData.path
+        // Get the public URL for the uploaded image
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(filePath)
+
+        // Store the file and its URL in the form data
+        form.additionalProducts[index].image = {
+          file: file,
+          url: publicUrl
+        }
+
+        // Update the file list display
+        const fileList = event.target.parentElement.nextElementSibling
+        fileList.innerHTML = `<div class="file-item">${file.name}</div>`
       } catch (err) {
-        console.error('Product image upload error:', err)
-        throw new Error(`Product image upload failed: ${err.message}`)
+        console.error('Error uploading additional product image:', err)
+        alert('Failed to upload image. Please try again.')
       }
     }
 

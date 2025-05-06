@@ -382,7 +382,12 @@
             No submissions yet
           </div>
           <div v-for="submission in modalSubmissions" :key="submission.id" class="brand-item">
-            <h3>{{ submission.brand_name }}</h3>
+            <div class="brand-header">
+              <h3>{{ submission.brand_name }}</h3>
+              <button class="btn btn-danger" @click="confirmRemoveBrand(submission)">
+                Remove Brand
+              </button>
+            </div>
             <p><strong>Contact:</strong> {{ submission.contact_name }}</p>
             <p><strong>Email:</strong> {{ submission.contact_email }}</p>
             <p><strong>Pages Selected:</strong></p>
@@ -392,6 +397,19 @@
               </li>
             </ul>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remove Brand Confirmation Modal -->
+    <div class="modal" v-if="showRemoveConfirmation" @click="closeRemoveConfirmation">
+      <div class="modal-content" @click.stop>
+        <h3>Remove Brand</h3>
+        <p>Are you sure you want to remove {{ brandToRemove?.brand_name }} from this campaign?</p>
+        <p class="warning-text">This action cannot be undone.</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="closeRemoveConfirmation">Cancel</button>
+          <button class="btn btn-danger" @click="removeBrandSubmission">Confirm Removal</button>
         </div>
       </div>
     </div>
@@ -412,6 +430,8 @@ const selectedCampaign = ref(null)
 const filledPagesCounts = ref({})
 const modalSubmissions = ref([])
 const showArchived = ref(false)
+const showRemoveConfirmation = ref(false)
+const brandToRemove = ref(null)
 
 const defaultCampaignForm = {
   id: '',
@@ -470,7 +490,7 @@ async function loadCampaigns() {
       audience: campaign.audience,
       pageCount: campaign.page_count,
       pricing: campaign.pricing,
-      existingBrands: campaign.existing_brands,
+      existingBrands: campaign.existing_brands || [],
       status: campaign.status,
       createdAt: campaign.created_at,
       updatedAt: campaign.updated_at
@@ -728,6 +748,81 @@ async function toggleArchiveCampaign(campaign) {
   }
 }
 
+const confirmRemoveBrand = (submission) => {
+  brandToRemove.value = submission
+  showRemoveConfirmation.value = true
+}
+
+const closeRemoveConfirmation = () => {
+  showRemoveConfirmation.value = false
+  brandToRemove.value = null
+}
+
+const removeBrandSubmission = async () => {
+  try {
+    if (!brandToRemove.value) return
+
+    console.log('Removing brand submission:', brandToRemove.value)
+
+    // Remove the submission from campaign_submissions
+    const { error: deleteError } = await supabase
+      .from('campaign_submissions')
+      .delete()
+      .eq('id', brandToRemove.value.id)
+
+    if (deleteError) throw deleteError
+
+    console.log('Successfully removed from campaign_submissions')
+
+    // Update the campaign's existing_brands array to remove this brand
+    const { data: campaign, error: fetchError } = await supabase
+      .from('campaigns')
+      .select('existing_brands')
+      .eq('id', selectedCampaign.value.id)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    console.log('Current existing_brands:', campaign.existing_brands)
+
+    // Filter out the removed brand from existing_brands
+    const updatedExistingBrands = campaign.existing_brands.filter(
+      brand => brand.name !== brandToRemove.value.brand_name
+    )
+
+    console.log('Updated existing_brands:', updatedExistingBrands)
+
+    // Update the campaign with the filtered existing_brands
+    const { error: updateError } = await supabase
+      .from('campaigns')
+      .update({ existing_brands: updatedExistingBrands })
+      .eq('id', selectedCampaign.value.id)
+
+    if (updateError) throw updateError
+
+    console.log('Successfully updated campaign')
+
+    // Remove from local state
+    modalSubmissions.value = modalSubmissions.value.filter(
+      submission => submission.id !== brandToRemove.value.id
+    )
+
+    // Reload campaigns to reflect the changes
+    await loadCampaigns()
+
+    // Close the modal and reset the state
+    closeRemoveConfirmation()
+    showBrandsModal.value = false
+    selectedCampaign.value = null
+    modalSubmissions.value = []
+
+    console.log('Brand removal process completed')
+  } catch (err) {
+    console.error('Error removing brand:', err)
+    error.value = 'Failed to remove brand. Please try again.'
+  }
+}
+
 // Define all functions and variables that need to be used in the template
 defineExpose({
   loading,
@@ -753,7 +848,12 @@ defineExpose({
   calculateBusinessDays,
   getFilledPagesCount,
   copyContactEmails,
-  toggleArchiveCampaign
+  toggleArchiveCampaign,
+  showRemoveConfirmation,
+  brandToRemove,
+  confirmRemoveBrand,
+  closeRemoveConfirmation,
+  removeBrandSubmission
 })
 </script>
 
@@ -1084,5 +1184,34 @@ table td {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.brand-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.warning-text {
+  color: #dc3545;
+  font-weight: 500;
+  margin: 10px 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 }
 </style> 
