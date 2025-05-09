@@ -483,23 +483,37 @@ export default {
       
       // If it's already a full URL, return it
       if (filename.startsWith('http')) {
+        console.log('Using direct URL:', filename)
         return filename
       }
 
-      // Check if this is a brand logo
-      if (filename.includes('logo')) {
-        // Clean up the filename to remove any duplicate paths
-        const cleanFilename = filename.replace(/^.*?logos\//, '')
-        // Construct the full Supabase URL for brand logos
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-logos/${campaignId}/logos/${cleanFilename}`
-        console.log('Generated brand logo URL:', url)
-        return url
-      }
+      try {
+        // Check if this is a brand logo
+        if (filename.includes('logo')) {
+          // Clean up the filename to remove any duplicate paths
+          const cleanFilename = filename.replace(/^.*?logos\//, '')
+          // Construct the full Supabase URL for brand logos
+          const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-logos/${campaignId}/logos/${cleanFilename}`
+          console.log('Generated brand logo URL:', url)
+          return url
+        }
 
-      // For product images, use the full path as provided in the JSONB
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${filename}`
-      console.log('Generated product image URL:', url)
-      return url
+        // For product images, handle potential path formats
+        let path = filename
+        // If the filename doesn't include a directory structure, add the campaign ID
+        if (!path.includes('/')) {
+          path = `${campaignId}/${path}`
+        }
+      
+        // Construct the full Supabase URL for product images
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/product-images/${path}`
+        console.log('Generated product image URL:', url)
+        return url
+      } catch (error) {
+        console.error('Error generating image URL:', error)
+        // Return the original filename as a fallback
+        return filename
+      }
     }
 
     const getPageImage = (page) => {
@@ -590,6 +604,7 @@ export default {
 
     const downloadSingleAsset = async (submission) => {
       try {
+        console.log('Starting download for submission:', submission.id)
         const zip = new JSZip()
         
         // Add copy file
@@ -623,10 +638,20 @@ ${submission.text_content || 'None'}`
         // Add brand logo if available
         if (submission.brand_logo_url) {
           try {
-            const logoResponse = await fetch(submission.brand_logo_url)
+            console.log('Downloading brand logo:', submission.brand_logo_url)
+            const logoUrl = getImageUrl(submission.brand_logo_url, submission.campaign_id)
+            console.log('Logo URL:', logoUrl)
+            const logoResponse = await fetch(logoUrl, { mode: 'cors', cache: 'no-cache' })
+            
+            if (!logoResponse.ok) {
+              throw new Error(`Logo HTTP error! status: ${logoResponse.status}`)
+            }
+            
             const logoBlob = await logoResponse.blob()
+            console.log('Logo blob:', logoBlob.type, logoBlob.size)
             const logoFileName = submission.brand_logo_url.split('/').pop()
-            zip.file(`brand-logo/${logoFileName}`, logoBlob)
+            zip.file(`brand-logo/${logoFileName}`, logoBlob, { binary: true })
+            console.log('Logo added to zip')
           } catch (err) {
             console.error('Error downloading brand logo:', err)
           }
@@ -636,25 +661,71 @@ ${submission.text_content || 'None'}`
         for (const page of submission.selected_pages) {
           if (page.image_url) {
             try {
-              const response = await fetch(page.image_url)
+              console.log('Downloading product image for page', page.page_id, ':', page.image_url)
+              const imageUrl = getImageUrl(page.image_url, submission.campaign_id)
+              console.log('Full image URL:', imageUrl)
+              const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-cache' })
+              
+              if (!response.ok) {
+                throw new Error(`Image HTTP error! status: ${response.status}`)
+              }
+              
               const blob = await response.blob()
+              console.log('Image blob:', blob.type, blob.size)
               const fileName = page.image_url.split('/').pop()
-              zip.file(`products/${fileName}`, blob)
+              zip.file(`products/${fileName}`, blob, { binary: true })
+              console.log('Product image added to zip')
             } catch (err) {
               console.error(`Error downloading image for ${page.page_id}:`, err)
             }
           }
+          
+          // Add additional product images from each page's additional_products
+          if (page.layout === 'multi-product' && page.additional_products?.length) {
+            for (const product of page.additional_products) {
+              if (product.image_url) {
+                try {
+                  console.log('Downloading additional product image:', product.name, product.image_url)
+                  const imageUrl = getImageUrl(product.image_url, submission.campaign_id)
+                  console.log('Full additional product image URL:', imageUrl)
+                  const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-cache' })
+                  
+                  if (!response.ok) {
+                    throw new Error(`Additional product image HTTP error! status: ${response.status}`)
+                  }
+                  
+                  const blob = await response.blob()
+                  console.log('Additional product image blob:', blob.type, blob.size)
+                  const fileName = product.image_url.split('/').pop()
+                  zip.file(`additional-products/${fileName}`, blob, { binary: true })
+                  console.log('Additional product image added to zip')
+                } catch (err) {
+                  console.error(`Error downloading additional product image for ${product.name}:`, err)
+                }
+              }
+            }
+          }
         }
 
-        // Add additional product images
+        // Add additional product images from the submission level (backwards compatibility)
         if (submission.additional_products) {
           for (const product of submission.additional_products) {
             if (product.image?.url) {
               try {
-                const response = await fetch(product.image.url)
+                console.log('Downloading legacy additional product image:', product.name, product.image.url)
+                const imageUrl = product.image.url.startsWith('http') ? product.image.url : getImageUrl(product.image.url, submission.campaign_id)
+                console.log('Full legacy additional product image URL:', imageUrl)
+                const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-cache' })
+                
+                if (!response.ok) {
+                  throw new Error(`Legacy additional product image HTTP error! status: ${response.status}`)
+                }
+                
                 const blob = await response.blob()
+                console.log('Legacy additional product image blob:', blob.type, blob.size)
                 const fileName = product.image.url.split('/').pop()
-                zip.file(`additional-products/${fileName}`, blob)
+                zip.file(`additional-products/${fileName}`, blob, { binary: true })
+                console.log('Legacy additional product image added to zip')
               } catch (err) {
                 console.error(`Error downloading additional product image for ${product.name}:`, err)
               }
@@ -663,13 +734,20 @@ ${submission.text_content || 'None'}`
         }
 
         // Generate and download zip file
-        const content = await zip.generateAsync({ type: 'blob' })
+        console.log('Generating zip file...')
+        const content = await zip.generateAsync({ 
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        })
+        console.log('Zip generated, size:', content.size)
         const link = document.createElement('a')
         link.href = URL.createObjectURL(content)
         link.download = `${submission.brand_name}-assets.zip`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+        console.log('Download started')
       } catch (err) {
         console.error('Error creating zip file:', err)
         alert('Failed to download assets. Please try again.')
@@ -678,6 +756,7 @@ ${submission.text_content || 'None'}`
 
     const downloadCampaignAssets = async (campaign) => {
       try {
+        console.log('Starting campaign download for:', campaign.name)
         const zip = new JSZip()
         const campaignFolder = zip.folder(sanitizeFileName(campaign.name))
         
@@ -690,6 +769,7 @@ ${submission.text_content || 'None'}`
 
         // Process each submission
         for (const submission of campaign.submissions) {
+          console.log('Processing submission:', submission.brand_name)
           const submissionFolder = campaignFolder.folder(sanitizeFileName(submission.brand_name))
           
           // Add submission copy
@@ -699,13 +779,20 @@ ${submission.text_content || 'None'}`
           // Download and add brand logo if available
           if (submission.brand_logo_url) {
             try {
+              console.log('Downloading brand logo:', submission.brand_logo_url)
               const logoUrl = getImageUrl(submission.brand_logo_url, submission.campaign_id)
-              const response = await fetch(logoUrl)
+              console.log('Logo URL:', logoUrl)
+              const response = await fetch(logoUrl, { mode: 'cors', cache: 'no-cache' })
+              
               if (response.ok) {
                 const blob = await response.blob()
+                console.log('Logo blob:', blob.type, blob.size)
                 const fileName = `${sanitizeFileName(submission.brand_name)}_logo.${submission.brand_logo_url.split('.').pop()}`
-                logosFolder.file(fileName, blob)
-                submissionFolder.file(fileName, blob)
+                logosFolder.file(fileName, blob, { binary: true })
+                submissionFolder.file(fileName, blob, { binary: true })
+                console.log('Logo added to campaign zip')
+              } else {
+                console.error(`Logo HTTP error! status: ${response.status}`)
               }
             } catch (logoError) {
               console.error(`Error downloading logo for ${submission.brand_name}:`, logoError)
@@ -714,6 +801,7 @@ ${submission.text_content || 'None'}`
 
           // Process each page
           for (const page of submission.selected_pages) {
+            console.log('Processing page:', page.page_id)
             const folderName = `${sanitizeFileName(page.page_id)}_${sanitizeFileName(page.product_name)}`
             const pageFolder = submissionFolder.folder(folderName)
             
@@ -724,22 +812,65 @@ ${submission.text_content || 'None'}`
             // Download and add product image
             if (page.image_url) {
               try {
+                console.log('Downloading product image for page', page.page_id, ':', page.image_url)
                 const imageUrl = getImageUrl(page.image_url, submission.campaign_id)
-                const response = await fetch(imageUrl)
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+                console.log('Full image URL:', imageUrl)
+                const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-cache' })
+                
+                if (!response.ok) {
+                  throw new Error(`Image HTTP error! status: ${response.status}`)
+                }
+                
                 const blob = await response.blob()
+                console.log('Image blob:', blob.type, blob.size)
                 const fileName = `${sanitizeFileName(campaign.name)}_${sanitizeFileName(page.page_id)}_${sanitizeFileName(submission.brand_name)}_${sanitizeFileName(page.product_name)}.${page.image_url.split('.').pop()}`
-                pageFolder.file(fileName, blob)
+                pageFolder.file(fileName, blob, { binary: true })
+                console.log('Product image added to campaign zip')
               } catch (imgError) {
                 console.error(`Error downloading image for page ${page.page_id}:`, imgError)
+              }
+            }
+            
+            // Add additional product images from each page's additional_products
+            if (page.layout === 'multi-product' && page.additional_products?.length) {
+              console.log('Processing additional products for page', page.page_id)
+              const additionalProductsFolder = pageFolder.folder('additional_products')
+              for (const product of page.additional_products) {
+                if (product.image_url) {
+                  try {
+                    console.log('Downloading additional product image:', product.name, product.image_url)
+                    const imageUrl = getImageUrl(product.image_url, submission.campaign_id)
+                    console.log('Full additional product image URL:', imageUrl)
+                    const response = await fetch(imageUrl, { mode: 'cors', cache: 'no-cache' })
+                    
+                    if (!response.ok) {
+                      throw new Error(`Additional product image HTTP error! status: ${response.status}`)
+                    }
+                    
+                    const blob = await response.blob()
+                    console.log('Additional product image blob:', blob.type, blob.size)
+                    const fileName = `${sanitizeFileName(submission.brand_name)}_additional_${sanitizeFileName(product.name)}.${product.image_url.split('.').pop()}`
+                    additionalProductsFolder.file(fileName, blob, { binary: true })
+                    console.log('Additional product image added to campaign zip')
+                  } catch (imgError) {
+                    console.error(`Error downloading additional product image for ${product.name}:`, imgError)
+                  }
+                }
               }
             }
           }
         }
 
         // Generate and save zip file
-        const content = await zip.generateAsync({ type: 'blob' })
+        console.log('Generating campaign zip file...')
+        const content = await zip.generateAsync({ 
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        })
+        console.log('Campaign zip generated, size:', content.size)
         saveAs(content, `${sanitizeFileName(campaign.name)}_all_assets.zip`)
+        console.log('Campaign download started')
       } catch (err) {
         console.error('Error creating campaign zip:', err)
         alert('Failed to download campaign assets. Please try again.')
@@ -758,9 +889,9 @@ ${page.discount_code ? `Discount Code: ${page.discount_code}` : ''}
 `
 
       // Add additional products if present
-      if (page.layout === 'multi-product' && submission.additional_products?.length) {
+      if (page.layout === 'multi-product' && page.additional_products?.length) {
         content += '\nAdditional Products:\n'
-        submission.additional_products.forEach((product, index) => {
+        page.additional_products.forEach((product, index) => {
           content += `\nProduct ${index + 1}:
 Name: ${product.name || 'N/A'}
 Description: ${product.description || 'N/A'}
