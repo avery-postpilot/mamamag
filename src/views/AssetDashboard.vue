@@ -70,181 +70,185 @@
         </div>
 
         <div v-if="isCampaignExpanded(campaign.id)" class="submission-sections">
-          <div 
-            v-for="submission in campaign.submissions" 
-            :key="submission.id" 
-            class="submission-section"
-          >
-            <div class="submission-header">
-              <div class="submission-info">
-                <div class="brand-header">
-                  <div 
-                    v-if="submission.brand_logo_url" 
-                    class="brand-logo-container"
-                    @click="showImagePreview({ image_url: submission.brand_logo_url }, submission)"
-                  >
-                    <img 
-                      :src="getImageUrl(submission.brand_logo_url, submission.campaign_id)" 
-                      :alt="`${submission.brand_name} logo`"
-                      class="brand-logo"
+          <!-- Brand Selector Dropdown -->
+          <div class="brand-selector">
+            <label for="brand-select">Select Brand:</label>
+            <select 
+              id="brand-select" 
+              v-model="selectedBrands[campaign.id]" 
+              @change="handleBrandSelection(campaign.id)"
+            >
+              <option value="all">All Brands</option>
+              <option 
+                v-for="submission in campaign.submissions" 
+                :key="submission.id" 
+                :value="submission.id"
+              >
+                {{ submission.brand_name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Horizontal Submission Display -->
+          <div class="submissions-container">
+            <div 
+              v-for="submission in filteredSubmissions(campaign)" 
+              :key="submission.id" 
+              class="submission-section"
+            >
+              <div class="submission-header">
+                <div class="submission-info">
+                  <div class="brand-header">
+                    <div 
+                      v-if="submission.brand_logo_url" 
+                      class="brand-logo-container"
+                      @click="showImagePreview({ image_url: submission.brand_logo_url }, submission)"
                     >
-                  </div>
-                  <div class="brand-details">
-                    <h3>{{ submission.brand_name }}</h3>
-                    <span class="design-status" :class="{ added: submission.added_to_design }">
-                      {{ submission.added_to_design ? 'Added to Design' : 'Pending Design' }}
-                    </span>
+                      <img 
+                        :src="getImageUrl(submission.brand_logo_url, submission.campaign_id)" 
+                        :alt="`${submission.brand_name} logo`"
+                        class="brand-logo"
+                      >
+                    </div>
+                    <div class="brand-details">
+                      <h3>{{ submission.brand_name }}</h3>
+                      <span class="design-status" :class="{ added: submission.added_to_design }">
+                        {{ submission.added_to_design ? 'Added to Design' : 'Pending Design' }}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="submission-actions">
-                <button 
-                  class="btn" 
-                  :class="{ success: submission.added_to_design }"
-                  @click="toggleDesignStatus(submission)"
-                >
-                  {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
-                </button>
-                <button 
-                  class="btn secondary" 
-                  @click="downloadBrandLogo(submission)"
-                  :disabled="!submission.brand_logo_url"
-                >
-                  Download Logo
-                </button>
-              </div>
-            </div>
-
-            <!-- Designer Notes Section -->
-            <div v-if="isAuthorizedUser()" class="designer-notes-section">
-              <div class="notes-header">
-                <h4>Designer Notes</h4>
-                <button 
-                  class="btn secondary"
-                  @click="toggleNotesEdit(submission)"
-                >
-                  {{ isEditingNotes(submission.id) ? 'Cancel' : 'Edit Notes' }}
-                </button>
-              </div>
-              
-              <div v-if="isEditingNotes(submission.id)" class="notes-edit">
-                <textarea
-                  v-model="editNotes[submission.id]"
-                  placeholder="Add notes for the designer..."
-                  rows="4"
-                ></textarea>
-                <div class="notes-actions">
+                <div class="submission-actions">
                   <button 
-                    class="btn primary"
-                    @click="saveDesignerNotes(submission)"
+                    class="btn" 
+                    :class="{ success: submission.added_to_design }"
+                    @click="toggleDesignStatus(submission)"
                   >
-                    Save Notes
+                    {{ submission.added_to_design ? '✓ Added to Design' : 'Add to Design' }}
+                  </button>
+                  <button 
+                    class="btn secondary" 
+                    @click="downloadBrandLogo(submission)"
+                    :disabled="!submission.brand_logo_url"
+                  >
+                    Download Logo
+                  </button>
+                  <button 
+                    class="btn secondary" 
+                    @click="downloadSingleAsset(submission)"
+                  >
+                    Download Assets
+                  </button>
+                  <button 
+                    v-if="isAuthorizedUser()"
+                    class="btn primary"
+                    @click="openEditModal(submission)"
+                  >
+                    Edit Submission
                   </button>
                 </div>
               </div>
-              
-              <div v-else class="notes-display">
-                <p v-if="submission.designer_notes" class="notes-content">
-                  {{ submission.designer_notes }}
-                </p>
-                <p v-else class="no-notes">
-                  No designer notes yet.
-                </p>
-              </div>
-            </div>
 
-            <div class="pages-list">
-              <div 
-                v-for="(page, pageIdx) in submission.selected_pages" 
-                :key="page.page_id"
-                class="page-item"
-              >
-                <div class="page-content">
-                  <div 
-                    class="thumbnail-container" 
-                    @click="showImagePreview(page, submission)"
+              <!-- Designer Notes Section -->
+              <div v-if="isAuthorizedUser()" class="designer-notes-section">
+                <div class="notes-header">
+                  <h4>Designer Notes</h4>
+                  <button 
+                    class="btn secondary"
+                    @click="toggleNotesEdit(submission)"
                   >
-                    <img 
-                      v-if="page.image_url" 
-                      :src="getImageUrl(page.image_url, submission.campaign_id)" 
-                      :alt="page.product_name || 'Product image'"
-                      class="thumbnail"
+                    {{ isEditingNotes(submission.id) ? 'Cancel' : 'Edit Notes' }}
+                  </button>
+                </div>
+                
+                <div v-if="isEditingNotes(submission.id)" class="notes-edit">
+                  <textarea
+                    v-model="editNotes[submission.id]"
+                    placeholder="Add notes for the designer..."
+                    rows="4"
+                  ></textarea>
+                  <div class="notes-actions">
+                    <button 
+                      class="btn primary"
+                      @click="saveDesignerNotes(submission)"
                     >
-                    <div v-else class="no-image">
-                      <span class="no-image-icon">📷</span>
-                      <span>No Image Available</span>
-                    </div>
+                      Save Notes
+                    </button>
                   </div>
-                  
-                  <div class="page-info">
-                    <div class="page-header">
+                </div>
+                
+                <div v-else class="notes-display">
+                  <p v-if="submission.designer_notes" class="notes-content">
+                    {{ submission.designer_notes }}
+                  </p>
+                  <p v-else class="no-notes">
+                    No designer notes yet.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Row layout for products -->
+              <div class="products-row">
+                <div 
+                  v-for="(page, pageIdx) in submission.selected_pages" 
+                  :key="page.page_id"
+                  class="product-container"
+                >
+                  <div class="product-card main-product">
+                    <div class="product-card-header">
                       <span class="page-number">Page {{ page.page_id }}</span>
                       <span class="layout-type">{{ page.layout }}</span>
                     </div>
-                    
-                    <div class="product-details">
-                      <h4 class="product-name">{{ page.product_name || 'Untitled Product' }}</h4>
-                      <p class="product-description">{{ page.product_description || 'No description available.' }}</p>
-                      <p class="price">${{ formatNumber(page.product_price) || 'Price not set' }}</p>
-                      <p v-if="page.discount_code" class="discount-code">{{ page.discount_code }}</p>
-                      
-                      <!-- Additional Products Section -->
+
+                    <div class="product-card-content">
                       <div 
-                        v-if="page.layout === 'multi-product' && page.additional_products?.length" 
-                        class="additional-products"
+                        class="product-thumbnail" 
+                        @click="showImagePreview(page, submission)"
                       >
-                        <h5>Additional Products</h5>
-                        <div 
-                          v-for="(product, index) in page.additional_products" 
-                          :key="index" 
-                          class="additional-product"
+                        <img 
+                          v-if="page.image_url" 
+                          :src="getImageUrl(page.image_url, submission.campaign_id)" 
+                          :alt="page.product_name || 'Product image'"
+                          class="thumbnail"
                         >
-                          <div 
-                            class="product-thumbnail" 
-                            @click="showImagePreview(product, submission)"
-                          >
-                            <img 
-                              v-if="product.image_url" 
-                              :src="getImageUrl(product.image_url, submission.campaign_id)" 
-                              :alt="product.name || 'Additional product'"
-                            >
-                            <div v-else class="no-image">
-                              <span>No Image</span>
-                            </div>
-                          </div>
-                          <div class="product-info">
-                            <h6>{{ product.name }}</h6>
-                            <p>{{ product.description }}</p>
-                            <p class="price">${{ formatNumber(product.price) }}</p>
-                          </div>
+                        <div v-else class="no-image">
+                          <span class="no-image-icon">📷</span>
                         </div>
                       </div>
-
-                      <!-- Text Content Section -->
-                      <div 
-                        v-if="page.layout === 'text-image' && page.text_content" 
-                        class="text-content"
-                      >
-                        <h5>Article Text</h5>
-                        <p>{{ page.text_content }}</p>
+                      
+                      <div class="product-info">
+                        <h4 class="product-name">{{ page.product_name || 'Untitled Product' }}</h4>
+                        <p class="product-description">{{ page.product_description || 'No description available.' }}</p>
+                        <p class="price">${{ formatNumber(page.product_price) || 'Price not set' }}</p>
+                        <p v-if="page.discount_code" class="discount-code">{{ page.discount_code }}</p>
                       </div>
                     </div>
                   </div>
-
-                  <div class="page-actions">
-                    <button 
-                      class="btn secondary" 
-                      @click="downloadSingleAsset(submission)"
+                  
+                  <!-- Additional Products displayed horizontally -->
+                  <div v-if="page.layout === 'multi-product' && page.additional_products?.length" class="additional-products-container">
+                    <div 
+                      v-for="(product, index) in page.additional_products" 
+                      :key="index" 
+                      class="product-card additional-product"
+                      @click="showImagePreview(product, submission)"
                     >
-                      Download Assets
-                    </button>
-                    <button 
-                      v-if="isAuthorizedUser()"
-                      class="btn primary"
-                      @click="openEditModal(submission)"
-                    >
-                      Edit Submission
-                    </button>
+                      <div class="product-thumbnail sm">
+                        <img 
+                          v-if="product.image_url" 
+                          :src="getImageUrl(product.image_url, submission.campaign_id)" 
+                          :alt="product.name || 'Additional product'"
+                          class="thumbnail"
+                        >
+                        <div v-else class="no-image">
+                          <span class="no-image-icon">📷</span>
+                        </div>
+                      </div>
+                      <div class="product-info sm">
+                        <h5 class="product-name">{{ product.name }}</h5>
+                        <p class="price">${{ formatNumber(product.price) }}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -356,6 +360,7 @@ export default {
     const editAdditionalProductImageFiles = ref({})
     const editNotes = ref({})
     const editingNotesId = ref(null)
+    const selectedBrands = ref({})
 
     // Load data from Supabase
     const loadData = async () => {
@@ -373,6 +378,11 @@ export default {
           throw campaignError
         }
         campaigns.value = campaignData
+
+        // Initialize selectedBrands with 'all' for each campaign
+        campaigns.value.forEach(campaign => {
+          selectedBrands.value[campaign.id] = 'all'
+        })
 
         // Load submissions with all necessary fields
         const { data: submissionData, error: submissionError } = await supabase
@@ -1145,6 +1155,20 @@ Status: ${submission.status}
       }
     }
 
+    const filteredSubmissions = (campaign) => {
+      if (!selectedBrands.value[campaign.id] || selectedBrands.value[campaign.id] === 'all') {
+        return campaign.submissions
+      } else {
+        return campaign.submissions.filter(submission => submission.id === selectedBrands.value[campaign.id])
+      }
+    }
+
+    const handleBrandSelection = (campaignId) => {
+      // This function is just a placeholder
+      // The actual filtering happens in filteredSubmissions
+      console.log(`Selected brand changed for campaign ${campaignId} to: ${selectedBrands.value[campaignId]}`)
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -1182,7 +1206,10 @@ Status: ${submission.status}
       editNotes,
       isEditingNotes,
       toggleNotesEdit,
-      saveDesignerNotes
+      saveDesignerNotes,
+      selectedBrands,
+      filteredSubmissions,
+      handleBrandSelection
     }
   }
 }
@@ -1281,11 +1308,49 @@ Status: ${submission.status}
   padding: 20px;
 }
 
-.submission-section {
+.submission-sections {
+  padding: 15px;
+}
+
+.brand-selector {
   margin-bottom: 20px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.brand-selector label {
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
+}
+
+.brand-selector select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 200px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.submissions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.submission-section {
+  width: 100%;
+  margin-bottom: 0;
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .submission-header {
@@ -1300,147 +1365,130 @@ Status: ${submission.status}
 .submission-actions {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.pages-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+.products-row {
+  display: flex;
+  overflow-x: auto;
+  padding: 20px;
   gap: 20px;
-  padding: 15px;
+  scrollbar-width: thin;
 }
 
-.page-item {
-  margin-bottom: 0;
+.products-row::-webkit-scrollbar {
+  height: 8px;
+}
+
+.products-row::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.products-row::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 4px;
+}
+
+.products-row::-webkit-scrollbar-thumb:hover {
+  background: #ccc;
+}
+
+.product-container {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+  flex: 0 0 auto;
+  min-width: 300px;
+  max-width: 800px;
   border: 1px solid #eee;
   border-radius: 8px;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  transition: box-shadow 0.2s ease;
-}
-
-.page-item:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.page-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.thumbnail-container {
-  width: 100%;
-  height: 300px;
-  background: #f8f9fa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-  cursor: pointer;
-}
-
-.thumbnail {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.thumbnail:hover {
-  opacity: 0.9;
-}
-
-.page-info {
-  flex: 1;
-  padding: 15px;
-  border-top: 1px solid #eee;
   background: white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 15px;
 }
 
-.page-header {
+.product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.main-product {
+  flex: 1;
+  min-width: 250px;
+  max-width: 350px;
+  border-right: 1px dashed #eee;
+  padding-right: 15px;
+}
+
+.additional-products-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  flex: 1;
+  align-content: flex-start;
+}
+
+.additional-product {
+  flex: 0 0 120px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.additional-product:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.product-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  padding: 0 0 10px 0;
   border-bottom: 1px solid #eee;
+  margin-bottom: 5px;
 }
 
 .page-number {
   font-weight: 600;
   color: #2c3e50;
-  font-size: 1.1em;
+  font-size: 0.9em;
 }
 
 .layout-type {
   color: #007bff;
-  font-size: 0.9em;
-  padding: 4px 8px;
+  font-size: 0.8em;
+  padding: 3px 6px;
   background: #e7f3ff;
   border-radius: 4px;
 }
 
-.product-details {
-  margin-top: 10px;
-}
-
-.product-name {
-  font-weight: 600;
-  font-size: 1.1em;
-  margin-bottom: 8px;
-  color: #2c3e50;
-}
-
-.product-description {
-  color: #666;
-  font-size: 0.9em;
-  line-height: 1.5;
-  margin-bottom: 15px;
-}
-
-.product-details .price {
-  color: #28a745;
-  font-weight: 600;
-  font-size: 1.1em;
-  margin-bottom: 15px;
-}
-
-.additional-products {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #eee;
-}
-
-.additional-products h5 {
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 10px;
-}
-
-.additional-product {
+.product-card-content {
   display: flex;
+  flex-direction: column;
   gap: 15px;
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.additional-product:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+  flex: 1;
 }
 
 .product-thumbnail {
-  width: 100px;
-  height: 100px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 180px;
   background: #f8f9fa;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  border-radius: 4px;
   cursor: pointer;
+}
+
+.product-thumbnail.sm {
+  height: 80px;
 }
 
 .product-thumbnail img {
@@ -1449,53 +1497,99 @@ Status: ${submission.status}
   object-fit: cover;
 }
 
+.product-thumbnail:hover img {
+  opacity: 0.9;
+}
+
 .product-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.product-info h6 {
+.product-info.sm {
+  gap: 4px;
+}
+
+.product-info.sm .product-name {
+  font-size: 0.85em;
+  margin: 0;
+}
+
+.product-info.sm .price {
+  font-size: 0.85em;
+}
+
+.product-name {
   font-weight: 600;
+  font-size: 1em;
   color: #2c3e50;
-  margin-bottom: 5px;
+  margin: 0;
 }
 
-.product-info p {
+.product-description {
   color: #666;
-  font-size: 0.9em;
+  font-size: 0.85em;
   line-height: 1.4;
-  margin-bottom: 5px;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-.product-info .price {
+.price {
   color: #28a745;
   font-weight: 600;
+  font-size: 1em;
+  margin: 0;
 }
 
-.page-actions {
-  padding: 15px;
-  background: #f8f9fa;
-  border-top: 1px solid #eee;
+.chip-container {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
 }
 
-.text-content {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid #eee;
-}
-
-.text-content h5 {
+.chip-label {
+  font-size: 0.85em;
   font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 10px;
+  color: #666;
+  flex-basis: 100%;
+  margin-bottom: 5px;
 }
 
-.text-content p {
+.product-chip {
+  padding: 5px 10px;
+  background: #f0f0f0;
+  border-radius: 20px;
+  font-size: 0.8em;
+  color: #333;
+  cursor: pointer;
+}
+
+.product-chip:hover {
+  background: #e0e0e0;
+}
+
+.no-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   color: #666;
-  font-size: 0.9em;
-  line-height: 1.6;
+  height: 100%;
+  width: 100%;
+  background: #f8f9fa;
+}
+
+.no-image-icon {
+  font-size: 1.5em;
+  opacity: 0.5;
 }
 
 .loading-state {
@@ -1649,111 +1743,6 @@ Status: ${submission.status}
   color: #28a745;
 }
 
-.no-image {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #666;
-  font-size: 0.9em;
-  height: 100%;
-  background: #f8f9fa;
-}
-
-.no-image-icon {
-  font-size: 2em;
-  opacity: 0.5;
-}
-
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn.primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn.primary:hover {
-  background: #0056b3;
-}
-
-.btn.secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn.secondary:hover {
-  background: #5a6268;
-}
-
-.btn.success {
-  background: #28a745;
-  color: white;
-}
-
-.btn.success:hover {
-  background: #218838;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.brand-header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.brand-logo-container {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: 4px;
-  overflow: hidden;
-  cursor: pointer;
-  background: #f8f9fa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #eee;
-  transition: transform 0.2s ease;
-}
-
-.brand-logo-container:hover {
-  transform: scale(1.05);
-}
-
-.brand-logo {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.brand-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.discount-code {
-  color: #4CAF50;
-  font-weight: 500;
-  margin-top: 8px;
-  padding: 4px 8px;
-  background-color: #E8F5E9;
-  border-radius: 4px;
-  display: inline-block;
-}
-
 .modal {
   position: fixed;
   top: 0;
@@ -1865,5 +1854,94 @@ hr {
   margin: 0;
   color: #666;
   font-style: italic;
+}
+
+/* Restore necessary styles */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn.primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn.primary:hover {
+  background: #0056b3;
+}
+
+.btn.secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn.secondary:hover {
+  background: #5a6268;
+}
+
+.btn.success {
+  background: #28a745;
+  color: white;
+}
+
+.btn.success:hover {
+  background: #218838;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.brand-logo-container {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eee;
+  transition: transform 0.2s ease;
+}
+
+.brand-logo-container:hover {
+  transform: scale(1.05);
+}
+
+.brand-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.brand-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.discount-code {
+  color: #4CAF50;
+  font-weight: 500;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background-color: #E8F5E9;
+  border-radius: 4px;
+  display: inline-block;
 }
 </style> 
