@@ -1116,20 +1116,54 @@ export default {
           brandLogoUrl: brandLogoUrl
         }))
 
-        // Process additional products for multi-product layouts
+        // Process all pages and their products
+        const selectedPagesData = []
+        const additionalProductsData = []
+        
         for (const pageId of selectedPages.value) {
           const form = productForms.value[pageId]
-          if (form.layout === 'multi-product' && form.additionalProducts) {
-            // Ensure each additional product has its image URL stored
-            form.additionalProducts = form.additionalProducts.map(product => ({
-              name: product.name,
-              price: parseFloat(product.price),
-              description: product.description,
-              image: product.image ? {
-                url: product.image.url
-              } : null
-            }))
+          const pageData = {
+            page_id: pageId,
+            layout: form.layout,
+            product_name: form.productName,
+            product_description: form.productDescription,
+            product_price: parseFloat(form.productPrice),
+            discount_code: form.discountCode,
+            image_url: null
           }
+
+          // Upload main product image
+          if (form.productImages && form.productImages.length > 0) {
+            const imageUrl = await uploadProductImage(form.productImages[0], pageId)
+            pageData.image_url = imageUrl
+          }
+
+          // Process additional products for multi-product layouts
+          if (form.layout === 'multi-product' && form.additionalProducts) {
+            const additionalProducts = []
+            for (const additionalProduct of form.additionalProducts) {
+              if (additionalProduct.name && additionalProduct.price && additionalProduct.description) {
+                const additionalProductData = {
+                  name: additionalProduct.name,
+                  price: parseFloat(additionalProduct.price),
+                  description: additionalProduct.description,
+                  image: { url: null }
+                }
+
+                // Upload additional product image if available
+                if (additionalProduct.image && additionalProduct.image.file) {
+                  const additionalImageUrl = await uploadProductImage(additionalProduct.image.file, `${pageId}-additional-${Date.now()}`)
+                  additionalProductData.image.url = additionalImageUrl
+                }
+
+                additionalProducts.push(additionalProductData)
+                additionalProductsData.push(additionalProductData)
+              }
+            }
+            pageData.additional_products = additionalProducts
+          }
+
+          selectedPagesData.push(pageData)
         }
 
         const submissionData = {
@@ -1139,63 +1173,40 @@ export default {
           contact_email: formData.value.contactEmail,
           brand_url: formData.value.brandWebsite,
           brand_logo_url: brandLogoUrl,
-          selected_pages: selectedPages.value.map(pageId => ({
-            page_id: pageId,
-            layout: productForms.value[pageId].layout,
-            product_name: productForms.value[pageId].productName,
-            product_description: productForms.value[pageId].productDescription,
-            product_price: parseFloat(productForms.value[pageId].productPrice),
-            discount_code: productForms.value[pageId].discountCode,
-            image_url: null // Will be updated after image upload
-          })),
+          page_id: selectedPagesData[0].page_id,
+          selected_pages: selectedPagesData,
+          additional_products: additionalProductsData,
           total_price: calculateTotalPrice(),
           status: 'pending',
-          layout_type: productForms.value[selectedPages.value[0]].layout,
-          page_id: selectedPages.value[0],
-          added_to_design: false,
-          additional_products: productForms.value[selectedPages.value[0]].additionalProducts || [],
-          text_content: productForms.value[selectedPages.value[0]].textContent || null
+          added_to_design: false
         }
 
-        // Upload images first
-        try {
-          for (const pageId of selectedPages.value) {
-            const form = productForms.value[pageId]
-            if (form.productImages && form.productImages.length > 0) {
-              const imageUrl = await uploadProductImage(form.productImages[0], pageId)
-              const pageIndex = submissionData.selected_pages.findIndex(p => p.page_id === pageId)
-              if (pageIndex !== -1) {
-                submissionData.selected_pages[pageIndex].image_url = imageUrl
-              }
-            }
-          }
+        // Insert the submission into the database
+        const { data, error: dbError } = await supabase
+          .from('campaign_submissions')
+          .insert(submissionData)
+          .select()
 
-          // Insert the submission into the database
-          const { data, error: dbError } = await supabase
-            .from('campaign_submissions')
-            .insert(submissionData)
-            .select()
-
-          if (dbError) throw dbError
-
-          // Show success message and reset form
-          alert('Reservation submitted successfully!')
-          selectedPages.value = []
-          formData.value = {
-            brandName: '',
-            contactName: '',
-            contactEmail: '',
-            brandWebsite: '',
-            brandLogo: null
-          }
-          productForms.value = {}
-          closeModal()
-
-        } catch (err) {
-          console.error('Error submitting reservation:', err)
-          throw new Error(`Failed to submit reservation: ${err.message}`)
+        if (dbError) {
+          console.error('Error inserting submission:', dbError)
+          throw dbError
         }
+
+        // Show success message and reset form
+        alert('Reservation submitted successfully!')
+        selectedPages.value = []
+        formData.value = {
+          brandName: '',
+          contactName: '',
+          contactEmail: '',
+          brandWebsite: '',
+          brandLogo: null
+        }
+        productForms.value = {}
+        closeModal()
+
       } catch (err) {
+        console.error('Submission error:', err)
         error.value = err.message
       } finally {
         loading.value = false
