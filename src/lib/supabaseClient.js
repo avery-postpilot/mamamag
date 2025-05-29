@@ -103,4 +103,21 @@ export const uploadImage = async (file, path) => {
     console.error('Upload error:', error)
     return { data: null, error }
   }
+}
+
+// Designs table definition
+export const designsTable = {
+  name: 'designs',
+  columns: {
+    id: 'uuid primary key',
+    brand_id: 'uuid references brands(id)',
+    name: 'text',
+    description: 'text',
+    layout_type: 'text',
+    design_url: 'text',
+    preview_url: 'text',
+    created_at: 'timestamp with time zone',
+    updated_at: 'timestamp with time zone',
+    is_active: 'boolean default true'
+  }
 } 

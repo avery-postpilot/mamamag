@@ -10,6 +10,7 @@ import CampaignLanding from '../views/CampaignLanding.vue'
 import BrandLookup from '../views/BrandLookup.vue'
 import InviteCodeVerification from '../components/InviteCodeVerification.vue'
 import InviteCodeAdmin from '../components/InviteCodeAdmin.vue'
+import Designs from '@/views/admin/Designs.vue'
 
 const routes = [
   {
@@ -68,6 +69,15 @@ const routes = [
     name: 'invite-code-admin',
     component: InviteCodeAdmin,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/designs',
+    name: 'Designs',
+    component: Designs,
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true
+    }
   }
 ]
 

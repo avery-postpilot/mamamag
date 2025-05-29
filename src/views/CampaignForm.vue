@@ -184,7 +184,8 @@
               <div id="selected-pages-list">
                 <div v-for="pageId in selectedPages" 
                      :key="pageId" 
-                     class="selected-page-item">
+                     class="selected-page-item"
+                     :id="'page-form-' + pageId">
                   <div class="page-info">
                     <strong>{{ getPageData(pageId).name }}</strong> 
                     (Page {{ getPageData(pageId).pageNumber }})
@@ -197,8 +198,29 @@
                 <div v-for="pageId in selectedPages"
                      :key="pageId"
                      class="product-form"
+                     :id="'product-form-' + pageId"
                      :data-page-id="pageId">
                   <h4 class="page-title">{{ getPageData(pageId).name }}</h4>
+                  
+                  <!-- Design Selection -->
+                  <div class="form-group">
+                    <label>Use Existing Design</label>
+                    <div class="design-selection">
+                      <select v-model="productForms[pageId].selectedDesign" @change="handleDesignSelection(pageId)">
+                        <option value="">Select a design...</option>
+                        <option v-for="design in availableDesigns" 
+                                :key="design.id" 
+                                :value="design.id">
+                          {{ design.name }}
+                        </option>
+                      </select>
+                      <div v-if="productForms[pageId].selectedDesign" class="selected-design-preview">
+                        <img :src="getSelectedDesignPreview(pageId)" :alt="getSelectedDesignName(pageId)">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Rest of the form fields -->
                   <div class="form-group">
                     <label class="required">Product Name</label>
                     <input type="text" v-model="productForms[pageId].productName" required>
@@ -328,11 +350,9 @@
                   </div>
                 </div>
               </div>
-
-              <div class="btn-group">
-                <button type="button" class="btn btn-secondary" @click="closePlacementModal">Cancel</button>
-                <button type="button" class="btn" @click="addPlacements">Add Placements</button>
-              </div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" @click="closePlacementModal">Done</button>
             </div>
           </div>
         </div>
@@ -494,6 +514,7 @@ export default {
       selectedPages: [],
       totalPrice: 0
     })
+    const availableDesigns = ref([])
 
     const layoutOptions = {
       fullPage: {
@@ -885,6 +906,14 @@ export default {
         // Initialize product form for this page
         initializeProductForm(page.id)
         showPlacementModal.value = true
+        
+        // Scroll to the newly added page form after a short delay to allow DOM update
+        setTimeout(() => {
+          const element = document.getElementById('product-form-' + page.id)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
       } else {
         selectedPages.value.splice(index, 1)
         delete productForms.value[page.id]
@@ -1129,7 +1158,24 @@ export default {
             product_description: form.productDescription,
             product_price: parseFloat(form.productPrice),
             discount_code: form.discountCode,
-            image_url: null
+            image_url: null,
+            design_id: form.selectedDesign || null // Add design_id to page data
+          }
+
+          // If an existing design is selected, get its file URL
+          if (form.selectedDesign) {
+            const { data: designData, error: designError } = await supabase
+              .from('designs')
+              .select('design_url, preview_url')
+              .eq('id', form.selectedDesign)
+              .single()
+
+            if (designError) {
+              console.error('Error fetching design:', designError)
+            } else if (designData) {
+              pageData.design_url = designData.design_url
+              pageData.preview_url = designData.preview_url // Add preview_url
+            }
           }
 
           // Upload main product image
@@ -1490,6 +1536,81 @@ export default {
       showPreviewModal.value = false
     }
 
+    const loadAvailableDesigns = async () => {
+      try {
+        // Get brand ID from the invite code
+        const { data: brandData, error: brandError } = await supabase
+          .from('brands')
+          .select('id')
+          .eq('contactEmail', formData.value.contactEmail)
+          .single()
+
+        if (brandError) throw brandError
+
+        // Load designs for this brand
+        const { data: designs, error: designsError } = await supabase
+          .from('designs')
+          .select('*')
+          .eq('brand_id', brandData.id)
+          .eq('is_active', true)
+
+        if (designsError) throw designsError
+        availableDesigns.value = designs
+      } catch (err) {
+        console.error('Error loading designs:', err)
+      }
+    }
+
+    const handleDesignSelection = (pageId) => {
+      const designId = productForms.value[pageId].selectedDesign
+      if (!designId) return
+
+      const design = availableDesigns.value.find(d => d.id === designId)
+      if (!design) return
+
+      // Update form with design data
+      productForms.value[pageId] = {
+        ...productForms.value[pageId],
+        layout: design.layout_type,
+        productName: design.name,
+        productDescription: design.description,
+        productPrice: '0.00', // Initialize with a default value
+        productImages: [], // Initialize empty array
+        additionalProducts: [], // Initialize empty array
+        textContent: '', // Initialize empty string
+        discountCode: '' // Initialize empty string
+      }
+
+      // If it's a multi-product layout, initialize with one empty product
+      if (design.layout_type === 'multi-product') {
+        productForms.value[pageId].additionalProducts = [{
+          name: '',
+          price: '0.00',
+          description: '',
+          image: null
+        }]
+      }
+    }
+
+    const getSelectedDesignPreview = (pageId) => {
+      const designId = productForms.value[pageId].selectedDesign
+      const design = availableDesigns.value.find(d => d.id === designId)
+      return design ? design.preview_url : ''
+    }
+
+    const getSelectedDesignName = (pageId) => {
+      const designId = productForms.value[pageId].selectedDesign
+      const design = availableDesigns.value.find(d => d.id === designId)
+      return design ? design.name : ''
+    }
+
+    // Watch for contact email changes to load designs
+    watch(() => formData.value.contactEmail, (newEmail) => {
+      if (newEmail) {
+        loadAvailableDesigns()
+      }
+    })
+
     onMounted(() => {
       loadPrefilledData()
       loadCampaign()
@@ -1538,7 +1659,11 @@ export default {
       removeAdditionalProduct,
       handleAdditionalProductImageUpload,
       showPreview,
-      closePreview
+      closePreview,
+      availableDesigns,
+      handleDesignSelection,
+      getSelectedDesignPreview,
+      getSelectedDesignName
     }
   }
 }
@@ -2452,5 +2577,39 @@ input:focus, textarea:focus, select:focus {
   &:hover {
     color: #000;
   }
+}
+
+.design-selection {
+  margin-bottom: 20px;
+}
+
+.selected-design-preview {
+  margin-top: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  
+  img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
+}
+
+.modal-actions {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  background: white;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.product-form {
+  scroll-margin-top: 2rem; // Add some space when scrolling to the form
 }
 </style> 

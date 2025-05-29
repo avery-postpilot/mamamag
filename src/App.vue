@@ -4,6 +4,7 @@
       <router-link to="/">Home</router-link> |
       <router-link to="/campaign-manager">Campaign Manager</router-link> |
       <router-link to="/admin/invite-codes">Invite Codes</router-link> |
+      <router-link to="/admin/designs">Designs</router-link> |
       <router-link to="/assets">Assets</router-link> |
       <router-link to="/brands">Brand Lookup</router-link> |
       <router-link to="/sales-outreach">Sales Outreach</router-link>
